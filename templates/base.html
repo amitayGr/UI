@@ -1,0 +1,81 @@
+
+<!--   base.html-->
+
+<!--   Description:-->
+<!--       Base template for all pages in the Geometric Akinator system.-->
+<!--       Provides common structure including header, footer, and basic styling.-->
+
+<!--   Author: Karin Hershko and Afik Dadon-->
+<!--   Date: February 2025-->
+
+
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מערכת תומכת החלטה</title>
+
+    <!-- Base Styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/Header.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/Footer.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+    <!-- Page-specific styles -->
+    {% block css %}{% endblock %}
+</head>
+<body>
+    <div class="page-container">
+        <!-- Header Section -->
+        <header>
+            <div class="header-content">
+                <h1><a href="/">Geometric Akinator</a></h1>
+                <nav>
+                    <ul>
+                        <!-- Contact Link -->
+                        <li class="contact-icon">
+                            <a href="{{ url_for('contact_page.contact') }}" title="צור קשר">
+                                <i class="fa-solid fa-envelope"></i>
+                            </a>
+                        </li>
+
+                        <!-- User Navigation -->
+                        {% if session.get('user') %}
+                            <li>
+                                <a href="{{ url_for('login_page.logout') }}" title="התנתק">
+                                    <i class="fas fa-sign-out-alt"></i>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{{ url_for('user_profile_page.profile') }}" title="פרופיל">
+                                    <i class="fa-regular fa-circle-user profile-icon"></i>
+                                </a>
+                            </li>
+                        {% else %}
+                            <li>
+                                <a href="{{ url_for('login_page.login') }}" title="התחבר">
+                                    <i class="fa-regular fa-circle-user profile-icon"></i>
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="content-wrap">
+            {% block content %}{% endblock %}
+        </main>
+
+        <!-- Footer Section -->
+        <footer>
+            <p>&copy; 2024 כל הזכויות שמורות. מערכת תומכת החלטה לתלמידי תיכון</p>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/js/all.min.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,133 @@
+/**
+ * Header.css
+ * -------------------
+ * Description:
+ *     Defines styles for the site's header, navigation, and interactive elements.
+ *     Includes responsive design for mobile devices.
+ *
+ * Author: Karin Hershko and Afik Dadon
+ * Date: February 2025
+ */
+
+/* ===== Reset Styles ===== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* ===== Header Container ===== */
+header {
+    background-color: #4169e1;
+    color: white;
+    padding: 10px 20px;
+    font-family: 'Heebo', sans-serif;
+    box-shadow: 0 2px 2px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* ===== Header Title ===== */
+header h1 {
+    font-size: 22px;
+}
+
+header h1 a {
+    color: white;
+    text-decoration: none;
+}
+
+/* ===== Navigation ===== */
+nav ul {
+    display: flex;
+    align-items: center;
+    list-style: none;
+}
+
+nav ul li {
+    margin: 0 10px;
+}
+
+nav ul li a {
+    color: white;
+    text-decoration: none;
+    font-size: 24px;
+}
+
+/* ===== Profile Icon ===== */
+.profile-icon,
+.fa-circle-user {
+    font-size: 30px;
+    color: white;
+    border-radius: 50%;
+    padding: 10px;
+    transition: transform 0.1s;
+}
+
+.profile-icon:hover,
+.fa-circle-user:hover {
+    transform: scale(1.1);
+}
+
+/* ===== Contact Icon & Tooltip ===== */
+.contact-icon a {
+    position: relative;
+    color: white;
+    text-decoration: none;
+    font-size: 30px;
+    padding: 10px;
+    transition: transform 0.1s, color 0.2s;
+}
+
+.contact-icon a::after {
+    content: "צור קשר";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 5px;
+    opacity: 0;
+    visibility: hidden;
+    background-color: #333;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 14px;
+    white-space: nowrap;
+    transition: opacity 0.3s, visibility 0.3s;
+}
+
+.contact-icon a:hover::after {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* ===== Responsive Design ===== */
+@media screen and (max-width: 768px) {
+    header {
+        padding: 8px 15px;
+    }
+
+    header h1 {
+        font-size: 18px;
+    }
+
+    nav ul {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    nav ul li a {
+        font-size: 20px;
+    }
+
+    .profile-icon,
+    .fa-circle-user {
+        font-size: 25px;
+    }
+}

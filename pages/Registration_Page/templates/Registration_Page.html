@@ -1,0 +1,75 @@
+
+<!--   Registration_Page.html-->
+
+<!--   Description:-->
+<!--       Template for user registration page. Provides a clean, responsive interface-->
+<!--       for new user registration with real-time validation feedback.-->
+
+<!--   Author: Karin Hershko and Afik Dadon-->
+<!--   Date: February 2025-->
+
+
+{% extends "base.html" %}
+
+{% block css %}
+<link rel="stylesheet" href="{{ url_for('registration_page.static', filename='css/Registration_Page.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="registration-container">
+    <div class="registration-image-section">
+        <img src="{{ url_for('static', filename='media/hey.png') }}" alt="Registration Image" />
+    </div>
+    <div class="registration-form">
+        <h1>הרשמה למערכת</h1>
+        <form method="POST" action="{{ url_for('registration_page.register') }}" id="registrationForm" novalidate>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="first_name">שם פרטי</label>
+                    <input type="text" id="first_name" name="first_name" required>
+                </div>
+                <div class="form-group">
+                    <label for="last_name">שם משפחה</label>
+                    <input type="text" id="last_name" name="last_name" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="email">אימייל</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+
+            <div class="form-group">
+                <label for="password">סיסמה</label>
+                <div class="password-container">
+                    <input type="password" id="password" name="password" required>
+                    <button type="button" class="toggle-password">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="confirm_password">אימות סיסמה</label>
+                <div class="password-container">
+                    <input type="password" id="confirm_password" name="confirm_password" required>
+                    <button type="button" class="toggle-password">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+
+            <button type="submit" class="register-button">הרשם</button>
+        </form>
+
+        <div class="additional-options">
+            <a href="{{ url_for('login_page.login') }}" class="login-link">כבר רשום? התחבר כאן</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('registration_page.static', filename='js/Registration_Page.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,334 @@
+/**
+ * Home_Page.css
+ * ------------
+ * Description:
+ *     Core styles for the Geometric Learning System's home page.
+ *     Implements a responsive, modern design system with consistent
+ *     spacing, typography, and color schemes.
+ *
+ * Author: Karin Hershko and Afik Dadon
+ * Date: February 2025
+ */
+
+/* === Base Container === */
+.home-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+    font-family: 'Heebo', sans-serif;
+}
+
+/* === Welcome Section === */
+.welcome-section {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: rgba(220, 231, 232, 0.35);
+    border-radius: 1.5rem;
+    margin-bottom: 4rem;
+}
+
+.welcome-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 1000px;
+    margin: 0 auto;
+    gap: 2rem;
+}
+
+.welcome-text-content {
+    flex: 1;
+}
+
+.welcome-image {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.doorway-image {
+    max-width: 100%;
+    height: auto;
+    border-radius: 1rem;
+}
+
+/* Welcome Typography */
+.welcome-text {
+    font-size: 3rem;
+    color: #3F4D57;
+    margin-bottom: 1rem;
+}
+
+.welcome-subtitle {
+    font-size: 1.5rem;
+    color: #666;
+    margin-bottom: 2rem;
+}
+
+/* Welcome Button */
+.start-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem 2rem;
+    font-size: 1.2rem;
+    background-color: #4169e1;
+    color: white;
+    border: none;
+    border-radius: 1rem;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.start-btn:hover {
+    background-color: #3F4D57;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(65, 105, 225, 0.2);
+}
+
+/* === About Section === */
+.about-section {
+    margin-bottom: 4rem;
+}
+
+.about-section h2 {
+    text-align: center;
+    font-size: 2.2rem;
+    color: #3F4D57;
+    margin-bottom: 2rem;
+}
+
+.about-content {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+}
+
+.about-item {
+    text-align: center;
+    padding: 2rem;
+    background-color: white;
+    border-radius: 1rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.about-icon {
+    font-size: 2.5rem;
+    color: #4169e1;
+    margin-bottom: 1rem;
+}
+
+.about-item h3 {
+    font-size: 1.7rem;
+    color: #3F4D57;
+    margin-bottom: 1rem;
+}
+
+.about-item p {
+    color: #666;
+    line-height: 1.6;
+    font-size: 1.2em;
+}
+
+/* === Features Section === */
+.features-section {
+    margin-bottom: 4rem;
+}
+
+.features-section h2 {
+    text-align: center;
+    font-size: 2.2rem;
+    color: #3F4D57;
+    margin-bottom: 2rem;
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+}
+
+.feature-card {
+    text-align: center;
+    padding: 1.5rem;
+    background-color: white;
+    border-radius: 1rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.feature-card .features.icon {
+    font-size: 2rem;
+    color: #4169e1;
+    margin-bottom: 1rem;
+}
+
+.feature-card h3 {
+    font-size: 1.7rem;
+    color: #3F4D57;
+    margin-bottom: 1rem;
+}
+
+.feature-card p {
+    color: #666;
+    line-height: 1.6;
+    font-size: 1.2em;
+}
+
+/* === Feedback Section === */
+.feedback-section {
+    margin: 4rem 0;
+    padding: 2rem;
+}
+
+.feedback-container {
+    background: linear-gradient(135deg, #4169e1 0%, #5c85f7 100%);
+    border-radius: 1.5rem;
+    padding: 1rem 2rem;
+    text-align: center;
+    color: white;
+    box-shadow: 0 4px 12px rgba(65, 105, 225, 0.2);
+}
+
+.feedback-content {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.feedback-icon {
+    font-size: 3.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.feedback-content h2 {
+    font-size: 2.2rem;
+    margin-bottom: 1rem;
+    color: white;
+}
+
+.feedback-content p {
+    font-size: 1.3rem;
+    margin-bottom: 2rem;
+    opacity: 0.9;
+}
+
+.feedback-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 1rem 2.5rem;
+    font-size: 1.2rem;
+    background-color: white;
+    color: #4169e1;
+    border: none;
+    border-radius: 1rem;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.feedback-btn:hover {
+    background-color: #f0f0f0;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* === Call to Action Section === */
+.cta-section {
+    text-align: center;
+    padding: 4rem 0;
+    background: rgba(220, 231, 232, 0.35);
+    border-radius: 1.5rem;
+}
+
+.cta-section h2 {
+    font-size: 2.7rem;
+    color: #3F4D57;
+    margin-bottom: 1rem;
+}
+
+.cta-section p {
+    color: #666;
+    margin-bottom: 2rem;
+    font-size: 1.7rem;
+}
+
+.cta-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem 2rem;
+    font-size: 1.2rem;
+    background-color: #4169e1;
+    color: white;
+    border: none;
+    border-radius: 1rem;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.cta-btn:hover {
+    background-color: #3F4D57;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(65, 105, 225, 0.2);
+}
+
+/* === Responsive Design === */
+@media (max-width: 1024px) {
+    .about-content {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .features-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .welcome-content {
+        flex-direction: column;
+    }
+
+    .welcome-image {
+        order: -1;
+    }
+
+    .doorway-image {
+        max-width: 80%;
+    }
+
+    .welcome-text {
+        font-size: 2rem;
+    }
+
+    .welcome-subtitle {
+        font-size: 1.2rem;
+    }
+
+    .about-content {
+        grid-template-columns: 1fr;
+    }
+
+    .features-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .feedback-section {
+        margin: 3rem 0;
+        padding: 1rem;
+    }
+
+    .feedback-container {
+        padding: 2rem 1rem;
+    }
+
+    .feedback-content h2 {
+        font-size: 1.8rem;
+    }
+
+    .feedback-content p {
+        font-size: 1.1rem;
+    }
+}

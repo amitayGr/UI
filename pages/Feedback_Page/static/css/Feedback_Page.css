@@ -1,0 +1,366 @@
+/**
+ * Feedback_Page.css
+ * --------------
+ * Styles for the feedback form page including:
+ * - Layout and responsive design
+ * - Form styling
+ * - Rating scales and choice options
+ * - Animations and transitions
+ *
+ * Author: Karin Hershko and Afik Dadon
+ * Date: February 2025
+ */
+
+/*Main Container Styles*/
+.feedback-container {
+    max-width: 900px;
+    margin: 2rem auto;
+    padding: 2rem;
+    direction: rtl;
+    font-family: 'Heebo', sans-serif;
+}
+
+.feedback-container h1 {
+    text-align: center;
+    color: #3F4D57;
+    margin-bottom: 2rem;
+}
+
+/* === Section Styles ===
+ * Styles for individual feedback sections
+ */
+.feedback-section {
+    background: white;
+    border-radius: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.feedback-section h2 {
+    color: #4169e1;
+    margin-bottom: 1.5rem;
+    font-size: 1.5rem;
+}
+
+.scale-description {
+    color: #666;
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+}
+
+/* === Rating Questions Styles ===
+ * Styles for rating scale questions and options
+ */
+.rating-question {
+    margin-bottom: 2rem;
+    padding: 1rem;
+    border-radius: 1rem;
+    background: #f8f9fa;
+}
+
+.rating-question label {
+    display: block;
+    margin-bottom: 1rem;
+    font-weight: 500;
+}
+
+.rating-scale {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.rating-option {
+    text-align: center;
+}
+
+/* === Rating Input Styles ===
+ * Custom styles for rating radio inputs
+ */
+.rating-option input[type="radio"] {
+    display: none;
+}
+
+.rating-option label {
+    display: block;
+    width: 40px;
+    height: 40px;
+    line-height: 40px;
+    background-color: white;
+    color: black;
+    border: 2px solid #ddd;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+}
+
+.rating-option input[type="radio"]:checked + label {
+    background-color: #4169e1;
+    color: white;
+    border: 2px solid #ddd;
+}
+
+.rating-option label:hover {
+    background-color: lightgray;
+}
+
+/* === Choice Questions Styles ===
+ * Styles for yes/no/partial choice questions
+ */
+.choice-question {
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 1rem;
+}
+
+.choice-question > label {
+    display: block;
+    margin-bottom: 1.5rem;
+    font-weight: 500;
+}
+
+.choice-options {
+    display: flex;
+    gap: 2rem;
+    margin-top: 1rem;
+}
+
+.choice-option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.choice-option input[type="radio"] {
+    width: 20px;
+    height: 20px;
+}
+
+/* === Text Questions Styles ===
+ * Styles for open-ended text questions
+ */
+.text-question {
+    margin-bottom: 2rem;
+}
+
+.text-question label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.text-question textarea {
+    width: 100%;
+    padding: 1rem;
+    border: 2px solid #ddd;
+    border-radius: 0.5rem;
+    resize: vertical;
+    font-family: 'Heebo', sans-serif;
+    direction: rtl;
+    transition: border-color 0.3s ease;
+}
+
+.text-question textarea:focus {
+    border-color: #4169e1;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(65, 105, 225, 0.1);
+}
+
+/* === Submit Button Styles ===
+ * Styles for the form submit button
+ */
+.form-actions {
+    text-align: center;
+    margin-top: 2rem;
+}
+
+.submit-btn {
+    background: #4169e1;
+    color: white;
+    border: none;
+    padding: 1rem 3rem;
+    border-radius: 2rem;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.submit-btn:hover {
+    background: #3258ce;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(65, 105, 225, 0.2);
+}
+
+/* === Loading State Styles ===
+ * Styles for form submission loading state
+ */
+.submit-btn.loading {
+    opacity: 0.7;
+    cursor: not-allowed;
+    background: #3F4D57;
+}
+
+/* === Error Message Styles ===
+ * Styles for error message display
+ */
+.error-message {
+    display: none;
+    text-align: center;
+    padding: 1rem;
+    background: #f8d7da;
+    color: #721c24;
+    border-radius: 0.5rem;
+    margin-top: 1rem;
+    animation: fadeIn 0.3s ease-in;
+}
+
+/* === Modal Styles ===
+ * Styles for thank you modal
+ */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 20px;
+    border-radius: 10px;
+    width: 80%;
+    max-width: 500px;
+    text-align: center;
+    direction: rtl;
+    font-size: 18px;
+    animation: modalAppear 0.3s ease-out;
+}
+
+.thanks-image {
+    max-width: 250px;
+    margin: 30px auto;
+}
+
+.text-center {
+    text-align: center;
+}
+
+/* === Animations ===
+ * Define animations used throughout the form
+ */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes modalAppear {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* === Responsive Design ===
+ * Media queries for different screen sizes
+ */
+@media (max-width: 768px) {
+    .feedback-container {
+        padding: 1rem;
+    }
+
+    .feedback-section {
+        padding: 1.5rem;
+    }
+
+    .rating-scale {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 1rem;
+    }
+
+    .choice-options {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .rating-option label {
+        width: 35px;
+        height: 35px;
+        line-height: 35px;
+    }
+
+    .modal-content {
+        width: 90%;
+        padding: 15px;
+    }
+
+    .thanks-image {
+        max-width: 200px;
+    }
+}
+
+@media (max-width: 480px) {
+    .feedback-container h1 {
+        font-size: 1.8rem;
+    }
+
+    .feedback-section h2 {
+        font-size: 1.3rem;
+    }
+
+    .rating-question label,
+    .choice-question > label,
+    .text-question label {
+        font-size: 0.9rem;
+    }
+
+    .submit-btn {
+        padding: 0.8rem 2rem;
+        font-size: 1rem;
+    }
+
+    .thanks-image {
+        max-width: 150px;
+    }
+}
+
+/* === Print Styles ===
+ * Optimize for printing
+ */
+@media print {
+    .feedback-container {
+        margin: 0;
+        padding: 0;
+    }
+
+    .feedback-section {
+        break-inside: avoid;
+        box-shadow: none;
+        border: 1px solid #ddd;
+    }
+
+    .submit-btn,
+    .modal {
+        display: none;
+    }
+}

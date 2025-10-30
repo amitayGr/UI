@@ -1,0 +1,589 @@
+/**
+ * User_Profile_Page.css
+ * -------------------
+ * Description:
+ *     Styles for the user profile page, providing a responsive design for both
+ *     regular users and admin dashboard. Includes styles for statistics cards,
+ *     activity timeline, and data visualization components.
+ *
+ * Author: Karin Hershko and Afik Dadon
+ * Date: February 2025
+ */
+
+
+.profile-container {
+    max-width: 1000px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+    font-family: 'Heebo', sans-serif;
+    direction: rtl;
+}
+
+.profile-header {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border-radius: 1rem;
+    padding: 2rem 3rem;
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    margin-bottom: 2rem;
+    height: 200px;
+}
+
+.profile-avatar {
+    width: 200px;
+    height: 200px;
+    overflow: hidden;
+    display: inline-block;
+}
+
+.profile-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.profile-info h1 {
+    margin: 0;
+    font-size: 2rem;
+    color: #2d3748;
+    font-weight: 600;
+}
+
+.email-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.5rem 0;
+}
+
+.email-container i {
+    color: #4169e1;
+}
+
+.email {
+    color: #4a5568;
+    margin: 0;
+    font-size: 1rem;
+}
+
+.role-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 2rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.role-badge.admin {
+    background: linear-gradient(135deg, #4169e1 0%, #3451b2 100%);
+    color: white;
+}
+
+.role-badge.user {
+    background: #edf2f7;
+    color: #4a5568;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.section-header h2 {
+    margin: 0;
+    color: #2d3748;
+    font-size: 1.5rem;
+}
+
+/* Statistics Dashboard */
+.stats-dashboard {
+    background: white;
+    border-radius: 1rem;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+}
+
+.stat-card {
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    transition: transform 0.3s ease;
+    border: 1px solid #e2e8f0;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+}
+
+.stat-icon {
+    background: linear-gradient(135deg, #4169e1 0%, #3451b2 100%);
+    width: 50px;
+    height: 50px;
+    border-radius: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+}
+
+.stat-icon i {
+    font-size: 1.5rem;
+    color: white;
+}
+
+.stat-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #2d3748;
+}
+
+.stat-label {
+    color: #4a5568;
+    font-size: 0.9rem;
+}
+
+/* Question Statistics */
+.question-stats {
+    background: white;
+    border-radius: 1rem;
+    padding: 2rem;
+    margin-top: 2rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+}
+
+.question-list .question-id {
+    color: black;
+    font-size: 1.1rem;
+    font-weight: bold;
+    margin-bottom: 0.75rem;
+    display: block;
+}
+
+.question-list .question-text {
+    font-size: 1.1rem;
+    line-height: 1.5;
+    color: #2d3748;
+    margin-bottom: 0.5rem;
+}
+
+.question-list .question-difficulty {
+    color: #666;
+    font-size: 0.9rem;
+    display: block;
+    margin-bottom: 0.75rem;
+}
+
+.question-list .metrics-summary {
+    color: #4169e1;
+    font-weight: 500;
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.4);
+}
+
+.modal-content {
+    font-family: 'Heebo', sans-serif;
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    max-height: 80vh;
+    overflow-y: auto;
+    border-radius: 8px;
+    direction: rtl;
+}
+
+.modal-content h2 {
+    margin-bottom: 20px;
+    color: #2d3748;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-left: 15px;
+}
+
+.close:hover {
+    color: #666;
+}
+
+/* Theorems Modal Content */
+.theorems-list .theorem-item{
+    border-bottom: 1px solid #e2e8f0;
+    padding: 1.5rem 0;
+    margin-bottom: 1rem;
+}
+
+.theorems-list .theorem-item:last-child{
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.theorems-list .theorem-id{
+    color: #4169e1;
+    font-size: 1.1rem;
+    font-weight: bold;
+    margin-bottom: 0.75rem;
+    display: block;
+}
+
+.theorems-list .theorem-text {
+    font-size: 1.1rem;
+    line-height: 1.5;
+    color: #2d3748;
+    margin-bottom: 0.5rem;
+}
+
+.theorems-list .theorem-category {
+    color: #666;
+    font-size: 0.9rem;
+    display: block;
+}
+
+/* Recent Activity Section */
+.activity-section {
+    background: white;
+    border-radius: 1rem;
+    padding: 2rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+}
+
+.activity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.activity-item {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 1.25rem;
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    border-radius: 1rem;
+    transition: all 0.3s ease;
+    border: 1px solid #e2e8f0;
+}
+
+.activity-item:hover {
+    transform: translateX(-2px);
+    border-color: #4169e1;
+}
+
+.activity-icon {
+    background: #edf2f7;
+    width: 45px;
+    height: 45px;
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4169e1;
+    transition: all 0.3s ease;
+}
+
+.activity-item:hover .activity-icon {
+    background: #4169e1;
+    color: white;
+}
+
+.activity-content {
+    flex: 1;
+}
+
+.activity-time {
+    color: #718096;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.no-activity {
+    text-align: center;
+    padding: 3rem;
+    background: white;
+    border-radius: 1rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+}
+
+.no-activity i {
+    font-size: 3rem;
+    color: #4169e1;
+    margin-bottom: 1rem;
+}
+
+.start-exercise-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #4169e1;
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 2rem;
+    text-decoration: none;
+    margin-top: 1rem;
+    transition: all 0.3s ease;
+}
+
+.start-exercise-btn:hover {
+    background: #3451b2;
+    transform: translateY(-2px);
+}
+
+.admin-dashboard .section {
+    background: white;
+    border-radius: 1rem;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+}
+
+.analytics-container {
+    background: white;
+    border-radius: 1rem;
+    padding: 2rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    margin-bottom: 2rem;
+}
+
+.analytics-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.analytics-header h2 {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0;
+    color: #2d3748;
+    font-size: 1.5rem;
+}
+
+.analytics-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.search-box {
+    position: relative;
+}
+
+.search-box input {
+    padding: 0.75rem 2.5rem 0.75rem 1rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    width: 250px;
+    font-size: 0.9rem;
+}
+
+.search-box i {
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #718096;
+}
+
+.difficulty-filters {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.filter-btn {
+    padding: 0.5rem 1rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    background: white;
+    color: #4a5568;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.filter-btn:hover {
+    background: #f7fafc;
+}
+
+.filter-btn.active {
+    background: #4169e1;
+    color: white;
+    border-color: #4169e1;
+}
+
+.questions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+.question-box {
+    background: #f8fafc;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.question-box:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.question-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.difficulty-tag {
+    padding: 0.25rem 1rem;
+    border-radius: 1rem;
+    color: white;
+    font-size: 0.875rem;
+}
+
+.difficulty-tag.level-1 { background: #4ade80; }
+.difficulty-tag.level-2 { background: #fbbf24; }
+.difficulty-tag.level-3 { background: #ef4444; }
+
+.question-number {
+    color: #718096;
+    font-size: 0.875rem;
+}
+
+.question-content {
+    min-height: 4rem;
+    margin-bottom: 1.5rem;
+}
+
+.question-text {
+    color: #2d3748;
+    font-size: 1rem;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.metric-box {
+    background: white;
+    padding: 1rem;
+    border-radius: 0.75rem;
+    text-align: center;
+}
+
+.metric-value {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #4169e1;
+    margin-bottom: 0.25rem;
+}
+
+.metric-label {
+    color: #718096;
+    font-size: 0.875rem;
+}
+
+.theorem-filters {
+    margin-bottom: 1.5rem;
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.filter-btn {
+    padding: 0.5rem 1rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    background: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.filter-btn:hover {
+    background: #4169e1;
+    color: white;
+}
+
+.theorem-card {
+    background: white;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    border: 1px solid #e2e8f0;
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+    .profile-header {
+        flex-direction: column;
+        text-align: center;
+        gap: 1.5rem;
+    }
+
+    .activity-details {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .stat-card {
+        padding: 1.25rem;
+    }
+
+    .modal-content {
+        width: 95%;
+        margin: 2% auto;
+    }
+}

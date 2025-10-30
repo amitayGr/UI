@@ -1,0 +1,133 @@
+<!--
+Home_Page.html-->
+<!-- -&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;-->
+<!--Description:-->
+<!--    Main template for the Geometric Learning System's home page.-->
+<!--    Implements a responsive, modern landing page with sections for-->
+<!--    welcome message, about information, features, and call-to-action.-->
+
+<!--Author: Karin Hershko and Afik Dadon-->
+<!--Date: February 2025
+-->
+
+{% extends "base.html" %}
+
+{# Stylesheet imports #}
+{% block css %}
+<link rel="stylesheet" href="{{ url_for('home_page.static', filename='css/Home_Page.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="home-container">
+    {# Welcome Section #}
+    <section class="welcome-section">
+        <div class="welcome-content">
+            <div class="welcome-text-content">
+                <h1 class="welcome-text">
+                    {% if user_name %}
+                    {{ user_name }} ,ברוך הבא!
+                    {% else %}
+                    ברוך הבא!
+                    {% endif %}
+                </h1>
+                <p class="welcome-subtitle">למערכת תומכת החלטה לפתרון תרגילים בגאומטריה</p>
+                <a href="{{ url_for('question_page.question') if is_logged_in else url_for('login_page.login') }}" class="start-btn">
+                    <i class="fas fa-play"></i>
+                    {% if is_logged_in %}
+                    התחל לפתור
+                    {% else %}
+                    התחבר כדי להתחיל
+                    {% endif %}
+                </a>
+            </div>
+            <div class="welcome-image">
+                <img src="{{ url_for('static', filename='media/waving doorway.png') }}" alt="Welcome Image" class="doorway-image">
+            </div>
+        </div>
+    </section>
+
+    {# About Section #}
+    <section class="about-section">
+        <h2>אודות המערכת</h2>
+        <div class="about-content">
+            <div class="about-item">
+                <i class="fas fa-brain about-icon"></i>
+                <h3>מה זה?</h3>
+                <p>מערכת חכמה המסייעת בפתרון תרגילים בגאומטריה באמצעות שאלות ותשובות. המערכת מנתחת את התשובות שלך ומכוונת אותך לפתרון המתאים.</p>
+            </div>
+
+            <div class="about-item">
+                <i class="fas fa-graduation-cap about-icon"></i>
+                <h3>איך זה עובד?</h3>
+                <p>המערכת תשאל אותך סדרת שאלות על המשולש בתרגיל. בהתבסס על תשובותיך, היא תזהה את סוג המשולש ותציע את המשפטים הרלוונטיים לפתרון.</p>
+            </div>
+
+            <div class="about-item">
+                <i class="fas fa-star about-icon"></i>
+                <h3>היתרונות</h3>
+                <p>במקום לקבל פתרון מוכן, המערכת מובילה אותך בדרך לפתרון, מחזקת את הבנתך בחומר ומפתחת חשיבה עצמאית.</p>
+            </div>
+        </div>
+    </section>
+
+    {# Features Section #}
+    <section class="features-section">
+        <h2>תכונות מרכזיות</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <i class="fas fa-comments features icon"></i>
+                <h3>אינטראקטיבי</h3>
+                <p>דיאלוג פשוט וידידותי עם המערכת</p>
+            </div>
+
+            <div class="feature-card">
+                <i class="fas fa-lightbulb features icon"></i>
+                <h3>חכם</h3>
+                <p>מתאים את עצמו לרמת הידע שלך</p>
+            </div>
+
+            <div class="feature-card">
+                <i class="fas fa-book features icon"></i>
+                <h3>לימודי</h3>
+                <p>מסייע בהבנת המושגים והמשפטים</p>
+            </div>
+
+            <div class="feature-card">
+                <i class="fas fa-chart-line features icon"></i>
+                <h3>התקדמות</h3>
+                <p>עוקב אחר ההתקדמות שלך</p>
+            </div>
+        </div>
+    </section>
+
+    {# Feedback Section #}
+    <section class="feedback-section">
+        <div class="feedback-container">
+            <div class="feedback-content">
+                <i class="fas fa-comment-dots feedback-icon"></i>
+                <h2>המשוב שלך חשוב לנו!</h2>
+                <p>עזרו לנו להשתפר - שתפו אותנו בחוויית הלמידה שלכם</p>
+                <a href="{{ url_for('feedback_page.feedback') }}" class="feedback-btn">
+                    <i class="fas fa-paper-plane"></i>
+                    התחילו עכשיו!
+                </a>
+            </div>
+        </div>
+    </section>
+
+    {# Call to Action Section #}
+    <section class="cta-section">
+        <h2>מוכנים להתחיל?</h2>
+        <p>התחילו לפתור תרגילים בדרך חדשה ומעניינת</p>
+        <a href="{{ url_for('question_page.question') if is_logged_in else url_for('login_page.login') }}" class="cta-btn">
+            <i class="fas fa-rocket"></i>
+            {% if is_logged_in %}
+            בואו נתחיל
+            {% else %}
+            התחבר כדי להתחיל
+            {% endif %}
+        </a>
+    </section>
+</div>
+{% endblock %}

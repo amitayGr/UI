@@ -1,0 +1,248 @@
+<!--   User_Profile_Page.html-->
+
+<!--   Description:-->
+<!--       Template for user profile dashboard. Shows different views based on user role-->
+<!--       (admin/regular user). Displays user statistics, activity history, and for -->
+<!--       admins - system analytics.-->
+
+<!--   Author: Karin Hershko and Afik Dadon-->
+<!--   Date: February 2025-->
+
+{% extends "base.html" %}
+
+{% block css %}
+<link rel="stylesheet" href="{{ url_for('user_profile_page.static', filename='css/User_Profile_Page.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <!-- Profile Header Section -->
+    <div class="profile-header">
+        <div class="profile-avatar">
+            {% if user.role == 'admin' %}
+                <img src="{{ url_for('static', filename='media/king.png') }}" alt="Admin Profile">
+            {% else %}
+                <img src="{{ url_for('static', filename='media/profile sticker.png') }}" alt="User Profile">
+            {% endif %}
+        </div>
+        <div class="profile-info">
+            <h1>{{ user.first_name }} {{ user.last_name }}</h1>
+            <div class="email-container">
+                <i class="fas fa-envelope"></i>
+                <p class="email">{{ user.email }}</p>
+            </div>
+            <span class="role-badge {% if user.role == 'admin' %}admin{% else %}user{% endif %}">
+                <i class="fas {% if user.role == 'admin' %}fa-crown{% else %}fa-user{% endif %}"></i>
+                {{ 'מנהל' if user.role == 'admin' else 'משתמש' }}
+            </span>
+        </div>
+    </div>
+
+    <!-- Statistics Dashboard -->
+    <div class="stats-dashboard">
+        <div class="section-header">
+            <i class="fas fa-chart-pie"></i>
+            <h2>סטטיסטיקות משתמש</h2>
+        </div>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-tasks"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value">{{ user_stats[0] if user_stats[0] else 0 }}</span>
+                    <span class="stat-label">תרגילים שהתחלת</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value">{{ user_stats[1] if user_stats[1] else 0 }}</span>
+                    <span class="stat-label">תרגילים שסיימת</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-sign-in-alt"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value">{{ user_stats[2] if user_stats[2] else 0 }}</span>
+                    <span class="stat-label">התחברויות למערכת</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if user.role == 'admin' %}
+    <!-- Admin Dashboard -->
+    <div class="admin-dashboard">
+        <!-- System Overview -->
+        <div class="section">
+            <div class="section-header">
+                <i class="fas fa-chart-line"></i>
+                <h2>סקירת מערכת</h2>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-users"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-value">{{ admin_stats.system_stats.total_users }}</span>
+                        <span class="stat-label">משתמשים רשומים</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-user-clock"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-value">{{ admin_stats.system_stats.active_users_day }}</span>
+                        <span class="stat-label">פעילים היום</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-calendar-week"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-value">{{ admin_stats.system_stats.active_users_week }}</span>
+                        <span class="stat-label">פעילים בשבוע האחרון</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-check-double"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-value">{{ admin_stats.system_stats.completed_exercises }}</span>
+                        <span class="stat-label">תרגילים שהושלמו</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Question Analytics -->
+        <div class="analytics-container">
+            <div class="analytics-header">
+                <h2><i class="fas fa-chart-bar"></i> ניתוח שאלות</h2>
+                <div class="analytics-controls">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="questionSearch" placeholder="חיפוש שאלה...">
+                    </div>
+                    <div class="difficulty-filters">
+                        <button class="filter-btn active" data-filter="all">הכל</button>
+                        <button class="filter-btn" data-filter="1">קלה</button>
+                        <button class="filter-btn" data-filter="2">בינונית</button>
+                        <button class="filter-btn" data-filter="3">קשה</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="questions-grid">
+                {% for question in admin_stats.question_analytics %}
+                <div class="question-box" data-difficulty="{{ question.difficulty_level }}">
+                    <div class="question-header">
+                        <span class="difficulty-tag level-{{ question.difficulty_level }}">
+                            {{ "קלה" if question.difficulty_level == 1 else "בינונית" if question.difficulty_level == 2 else "קשה" }}
+                        </span>
+                        <span class="question-number">#{{ question.question_id }}</span>
+                    </div>
+                    <div class="question-content">
+                        <p class="question-text">{{ question.question_text }}</p>
+                    </div>
+                    <div class="metrics-grid">
+                        <div class="metric-box">
+                            <span class="metric-value">{{ question.unique_users }}</span>
+                            <span class="metric-label">משתמשים ייחודיים</span>
+                        </div>
+                        <div class="metric-box">
+                            <span class="metric-value">{{ question.total_asked }}</span>
+                            <span class="metric-label">מספר פעמים שנשאלה</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Theorem Database -->
+        <div class="section">
+            <div class="section-header">
+                <i class="fas fa-book"></i>
+                <h2>מאגר משפטים</h2>
+            </div>
+            <div class="theorem-filters">
+                <button class="filter-btn" onclick="filterTheorems('all')">הכל</button>
+                <button class="filter-btn" onclick="filterTheorems(0)">משולש כללי</button>
+                <button class="filter-btn" onclick="filterTheorems(1)">משולש שווה צלעות</button>
+                <button class="filter-btn" onclick="filterTheorems(2)">משולש שווה שוקיים</button>
+                <button class="filter-btn" onclick="filterTheorems(3)">משולש ישר זווית</button>
+            </div>
+            <div class="theorems-list">
+                {% for theorem in admin_stats.theorems %}
+                <div class="theorem-card" data-category="{{ theorem.category }}">
+                    <div class="theorem-header">
+                        <span class="theorem-id">משפט {{ theorem.theorem_id }}</span>
+                        <span class="theorem-category">
+                            {{ "משולש כללי" if theorem.category == 0 else
+                               "משולש שווה צלעות" if theorem.category == 1 else
+                               "משולש שווה שוקיים" if theorem.category == 2 else
+                               "משולש ישר זווית" }}
+                        </span>
+                    </div>
+                    <p class="theorem-text">{{ theorem.theorem_text }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Recent Activity Section (Non-Admin Only) -->
+    {% if user.role != 'admin' %}
+    <div class="activity-section">
+        <div class="section-header">
+            <i class="fas fa-history"></i>
+            <h2>היסטוריית פעילות</h2>
+        </div>
+        {% if recent_activity %}
+            <div class="activity-list">
+                {% for activity in recent_activity %}
+                <div class="activity-item">
+                    <div class="activity-icon">
+                        {% if activity[1] == 'LOGIN_ATTEMPT' %}
+                            <i class="fas fa-sign-in-alt"></i>
+                        {% elif activity[1] == 'SESSION_START' %}
+                            <i class="fas fa-play-circle"></i>
+                        {% elif activity[1] == 'SESSION_END' %}
+                            <i class="fas fa-check-circle"></i>
+                        {% else %}
+                            <i class="fas fa-circle"></i>
+                        {% endif %}
+                    </div>
+                    <div class="activity-content">
+                        <div class="activity-time">{{ activity[0].strftime('%d/%m/%Y %H:%M') }}</div>
+                        <div class="activity-description">
+                            {% if activity[1] == 'LOGIN_ATTEMPT' %}
+                                התחברות למערכת
+                            {% elif activity[1] == 'SESSION_START' %}
+                                התחלת תרגיל חדש
+                            {% elif activity[1] == 'SESSION_END' %}
+                                סיימת תרגיל בהצלחה
+                            {% else %}
+                                {{ activity[1] }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="no-activity">
+                <i class="fas fa-book-open"></i>
+                <p>אין פעילות אחרונה</p>
+                <a href="{{ url_for('question_page.start_question') }}" class="start-exercise-btn">
+                    <i class="fas fa-play"></i>
+                    התחל תרגיל חדש
+                </a>
+            </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('user_profile_page.static', filename='js/User_Profile_Page.js') }}"></script>
+{% endblock %}

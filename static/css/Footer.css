@@ -1,0 +1,41 @@
+/**
+ * Footer.css
+ * -------------------
+ * Description:
+ *     Defines styles for the site's footer and page container structure.
+ *     Ensures footer stays at bottom of page using flexbox layout.
+ *
+ * Author: Karin Hershko and Afik Dadon
+ * Date: February 2025
+ */
+
+/* ===== Page Structure ===== */
+.page-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.content-wrap {
+    flex: 1;
+}
+
+/* ===== Footer Styles ===== */
+footer {
+    background-color: #3F4D57;
+    color: white;
+    text-align: center;
+    padding: 8px;
+    font-size: 12px;
+    font-family: 'Heebo', sans-serif;
+    width: 100%;
+    box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* ===== Responsive Design ===== */
+@media screen and (max-width: 768px) {
+    footer {
+        font-size: 10px;
+        padding: 6px;
+    }
+}

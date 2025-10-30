@@ -1,0 +1,206 @@
+
+<!--Question_Page.html-->
+
+<!--Description:-->
+<!--    Main template for the question interface of the Geometric Learning System.-->
+<!--    Provides an interactive interface for answering geometry questions,-->
+<!--    viewing relevant theorems, and tracking progress through triangle weights.-->
+
+<!--Author: Karin Hershko and Afik Dadon-->
+<!--Date: February 2025-->
+
+
+{% extends "base.html" %}
+
+{# Stylesheet imports #}
+{% block css %}
+<link rel="stylesheet" href="{{ url_for('question_page.static', filename='css/Question_Page.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+{% endblock %}
+
+{% block content %}
+{# Chart.js Dependencies #}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.0.0/chartjs-plugin-datalabels.min.js"></script>
+<script>Chart.register(ChartDataLabels);</script>
+
+{# Initial Theorems Data #}
+<script id="initial-theorems-data" type="application/json">
+    {{ initial_theorems | tojson | safe }}
+</script>
+
+{# Main Content Layout #}
+<div class="content-wrapper">
+    {# Triangle Weights Chart #}
+    <div class="weights-chart-container">
+        <h3>התפלגות משולשים</h3>
+        <canvas id="triangleWeightsChart"></canvas>
+    </div>
+
+    {# Question Card #}
+    <div class="question-card">
+        <div class="question-content">
+            <div class="question-image">
+                <img src="{{ url_for('static', filename='media/question.png') }}" alt="Question">
+            </div>
+            <div class="question-section">
+                <h2 class="question-text" data-question-id="{{ question_id }}">{{ question_text }}</h2>
+                <div class="answer-buttons">
+                    <button class="answer-btn" data-answer="כן">
+                        <i class="fas fa-check"></i>כן
+                    </button>
+                    <button class="answer-btn" data-answer="לא">
+                        <i class="fas fa-times"></i>לא
+                    </button>
+                    <button class="answer-btn" data-answer="לא יודע">
+                        <i class="fas fa-question"></i>לא יודע
+                    </button>
+                    <button class="answer-btn" data-answer="כנראה">
+                        <i class="fas fa-lightbulb"></i>כנראה
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# High Relevance Modal #}
+<div id="highRelevanceModal" class="high-relevance-modal">
+    <div class="high-relevance-modal-content">
+        <div class="high-relevance-header">
+            <h3>משפטים אלו עשויים לעזור לך להתקדם בתרגיל:</h3>
+            <span class="close-relevance">&times;</span>
+        </div>
+        <div class="high-relevance-theorems"></div>
+    </div>
+</div>
+
+{# Fixed Action Buttons #}
+<div class="fixed-buttons">
+    <button class="theorem-btn" onclick="toggleTheorems()">
+        <i class="fas fa-list"></i>משפטים רלוונטיים
+    </button>
+    <div id="theoremTooltip" class="theorem-tooltip hidden">
+        רוצה לגלות את המשפטים הגיאומטריים שיקדמו אותך? לחץ על הכפתור!
+    </div>
+    <button class="finish-btn" onclick="confirmFinish()">
+        <i class="fas fa-times-circle"></i>סיום
+    </button>
+</div>
+
+{# Debug Button for Admins #}
+{% if user_role == 'admin' %}
+<button class="debug-btn" onclick="toggleDebug()">
+    <i class="fas fa-chevron-down"></i>מידע למפתחים
+</button>
+{% endif %}
+
+{# Modals #}
+{# Timeout Modal #}
+<div id="timeoutModal" class="timeout-modal">
+    <div class="timeout-modal-content">
+        <div class="timeout-modal-message">
+            האם ברצונך להמשיך בפתרון התרגיל?
+        </div>
+        <div class="timeout-modal-buttons">
+            <button class="timeout-btn continue" onclick="continueSession()">המשך</button>
+            <button class="timeout-btn finish" onclick="finishSession()">סיום</button>
+        </div>
+    </div>
+</div>
+
+{# Theorems Modal #}
+<div id="theoremsModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>משפטים רלוונטיים</h2>
+            <span class="close" onclick="toggleTheorems()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="theorem-list"></div>
+        </div>
+    </div>
+</div>
+
+{# Debug Modal #}
+<div id="debugModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>מידע למפתחים</h2>
+            <span class="close" onclick="toggleDebug()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="debug-tabs">
+                <button class="tab-btn active" onclick="switchTab('weights')">משקלים</button>
+                <button class="tab-btn" onclick="switchTab('scores')">ציוני שאלות</button>
+                <button class="tab-btn" onclick="switchTab('calculations')">חישובים</button>
+            </div>
+
+            <div id="weightsTab" class="tab-content active">
+                <div class="section">
+                    <h3>משקלי משולשים:</h3>
+                    <table class="triangle-weights-table">
+                        <tr>
+                            <th>משולש כללי (0)</th>
+                            <th>משולש שווה צלעות (1)</th>
+                            <th>משולש שווה שוקיים (2)</th>
+                            <th>משולש ישר זווית (3)</th>
+                        </tr>
+                        <tr class="triangle-weights-values">
+                        </tr>
+                    </table>
+                </div>
+                <div class="section">
+                    <h3>משקלי משפטים:</h3>
+                    <div class="theorem-weights scrollable"></div>
+                </div>
+            </div>
+
+            <div id="scoresTab" class="tab-content">
+                <div class="section">
+                    <h3>ציוני שאלות:</h3>
+                    <div class="question-scores scrollable"></div>
+                </div>
+            </div>
+
+            <div id="calculationsTab" class="tab-content">
+                <div class="section">
+                    <h3>חישובי שאלה נוכחית:</h3>
+                    <div class="current-calculations"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Finish Session Modal #}
+<div id="finishModal" class="modal">
+    <div class="modal-content">
+        <h2>סיום תרגיל</h2>
+        <p>איך היית מתאר את התקדמותך בתרגיל?</p>
+        <div class="feedback-buttons">
+            <button class="feedback-btn success" onclick="finishSession('solved')">
+                <i class="fas fa-check-circle"></i>
+                הצלחתי, תודה!
+            </button>
+            <button class="feedback-btn partial" onclick="finishSession('partial')">
+                <i class="fas fa-lightbulb"></i>
+                התקדמתי אבל אנסה תרגיל חדש
+            </button>
+            <button class="feedback-btn give-up" onclick="finishSession('gave_up')">
+                <i class="fas fa-times-circle"></i>
+                לא הצלחתי הפעם
+            </button>
+            <button class="feedback-btn cancel" onclick="hideFinishModal()">
+                <i class="fas fa-arrow-left"></i>
+                חזרה לתרגיל
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{# JavaScript imports #}
+{% block scripts %}
+<script src="{{ url_for('question_page.static', filename='js/Question_Page.js') }}"></script>
+{% endblock %}

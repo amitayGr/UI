@@ -1,0 +1,660 @@
+/**
+ * Question_Page.css
+ * ---------------
+ * Description:
+ *     Core styles for the question interface of the Geometric Learning System.
+ *     Implements responsive design for question display, modals, and interactive
+ *     components with consistent styling across all interface elements.
+ *
+ * Author: Karin Hershko and Afik Dadon
+ * Date: February 2025
+ */
+
+.question-container {
+    max-width: none;
+    margin: 2rem auto;
+    padding: 1rem;
+    direction: rtl;
+    font-family: 'Heebo', sans-serif;
+}
+
+.question-card {
+    left: 50%;
+    transform: translateX(50%);
+    justify-content: center;
+    background: white;
+    border-radius: 1.5rem;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    padding: 2.5rem;
+    flex: 0 0 auto;
+    width: 800px;
+    z-index: 1;
+}
+
+.question-content {
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+    font-family: 'Heebo', sans-serif;
+}
+
+.question-text {
+    font-size: 1.8rem;
+    color: #3F4D57;
+    margin-bottom: 2rem;
+}
+
+.answer-buttons {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+.answer-btn {
+    padding: 1rem;
+    font-size: 1.2rem;
+    background: #4169e1;
+    color: white;
+    border: none;
+    border-radius: 1rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.fixed-buttons {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.theorem-btn {
+    background: #4169e1;
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    border-radius: 1rem;
+    cursor: pointer;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s;
+}
+
+.theorem-tooltip {
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    background: white;
+    padding: 1rem;
+    border-radius: 1rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    color: #3F4D57;
+    margin-bottom: 1rem;
+    max-width: 250px;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+    font-family: 'Heebo', sans-serif;
+}
+
+.theorem-tooltip::after {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    right: 20px;
+    border-width: 10px 10px 0;
+    border-style: solid;
+    border-color: white transparent transparent;
+}
+
+.theorem-tooltip.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.theorem-tooltip.hidden {
+    opacity: 0;
+    visibility: hidden;
+}
+
+
+.finish-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    border-radius: 1rem;
+    cursor: pointer;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    font-family: 'Heebo', sans-serif;
+}
+
+.modal-content {
+    background: white;
+    margin: 10vh auto;
+    padding: 2rem 3rem;
+    width: 90%;
+    max-width: 800px;
+    border-radius: 1rem;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.modal-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.modal-buttons button {
+    padding: 0.8rem 2rem;
+    font-size: 1.1rem;
+    border-radius: 1rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-family: 'Heebo', sans-serif;
+}
+
+.modal-buttons button:first-child {
+    background: #dc3545;
+    color: white;
+    border: none;
+}
+
+.modal-buttons button:first-child:hover {
+    background: #c82333;
+}
+
+.modal-buttons button:last-child {
+    background: #6c757d;
+    color: white;
+    border: none;
+}
+
+.modal-buttons button:last-child:hover {
+    background: #5a6268;
+}
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.close {
+    font-size: 2rem;
+    cursor: pointer;
+}
+
+.theorem-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    counter-reset: theorem-counter;
+}
+
+.theorem-type {
+    display: inline;
+    opacity: 0.7;
+    margin-right: 0.5rem;
+}
+
+.triangle-general {
+    color: #559B92;
+}
+
+.triangle-equilateral {
+    color: #A59C95;
+}
+
+.triangle-isosceles {
+    color: #B8508D;
+}
+
+.triangle-right {
+    color: #565A9B;
+}
+
+.theorem-item {
+    counter-increment: theorem-counter;
+    padding: 1rem;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    background: white;
+    border-radius: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.theorem-item::before {
+    content: counter(theorem-counter) ".";
+    position: absolute;
+    right: -2rem;
+    top: 1rem;
+    font-weight: bold;
+    color: black;
+}
+
+.theorem-text {
+    margin-right: 2rem;
+    font-weight: bold;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.theorem-weight {
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.finish-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.cancel-btn {
+    padding: 0.8rem 1.5rem;
+    border: 1px solid #ccc;
+    background: white;
+    border-radius: 0.5rem;
+    cursor: pointer;
+}
+
+.confirm-btn {
+    padding: 0.8rem 1.5rem;
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+}
+
+.debug-btn {
+    position: fixed;
+    bottom: 2rem;
+    left: 2rem;
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    border-radius: 1rem;
+    cursor: pointer;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.debug-tabs {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 0.5rem;
+}
+
+.tab-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 1rem;
+    color: #666;
+    border-bottom: 2px solid transparent;
+}
+
+.tab-btn.active {
+    color: #4169e1;
+    border-bottom: 2px solid #4169e1;
+}
+
+.tab-content {
+    display: none;
+    padding: 1rem;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.section {
+    margin-bottom: 2rem;
+}
+
+.scrollable {
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 1rem;
+}
+
+.current-calculations {
+    font-family: 'Heebo', sans-serif;
+    white-space: pre-wrap;
+    background: #f5f5f5;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin-top: 1rem;
+}
+
+.current-calculations h4 {
+    font-family: 'Heebo', sans-serif;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.current-calculations pre {
+    font-family: 'Heebo', sans-serif;
+    margin: 0.5rem 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.question-score-item, .theorem-weight-item {
+    padding: 0.5rem;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+}
+
+.triangle-weights-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    direction: rtl;
+    text-align: center;
+}
+
+.triangle-weights-table th,
+.triangle-weights-table td {
+    border: 1px solid lightgray;
+    padding: 0.5rem;
+    background: white;
+}
+
+.triangle-weights-table th {
+    background: white;
+    color: black;
+    font-weight: bold;
+}
+
+.timeout-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 2000;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.timeout-modal.show {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 1;
+}
+
+.timeout-modal-content {
+    background: white;
+    border-radius: 1.5rem;
+    padding: 2.5rem;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    transform: translateY(20px);
+    opacity: 0;
+    transition: all 0.3s ease-out;
+    text-align: center;
+    direction: rtl;
+}
+
+.timeout-modal.show .timeout-modal-content {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.timeout-modal-message {
+    font-size: 1.5rem;
+    color: #3F4D57;
+    margin-bottom: 2rem;
+    font-family: 'Heebo', sans-serif;
+}
+
+.timeout-modal-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+}
+
+.timeout-btn {
+    padding: 0.8rem 2rem;
+    font-size: 1.1rem;
+    border-radius: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: 'Heebo', sans-serif;
+}
+
+.timeout-btn.continue {
+    background: #75975e;
+    color: white;
+    border: none;
+}
+
+.timeout-btn.continue:hover {
+    background: #658354;
+}
+
+.timeout-btn.finish {
+    background: #dc3545;
+    color: white;
+    border: none;
+}
+
+.timeout-btn.finish:hover {
+    background: #c82333;
+}
+
+.content-wrapper {
+    display: flex;
+    flex-direction: row-reverse;
+    justify-content: center;
+    gap: 20px;
+    margin: 50px auto 20px 50px;
+    width: 100%;
+    max-width: 1200px;
+    font-family: 'Heebo', sans-serif;
+    position: relative;
+}
+
+.weights-chart-container {
+    position: absolute;
+    left: 20px;
+    flex: 0 0 300px;
+    background: white;
+    border-radius: 1.5rem;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    padding: 2.5rem;
+    height: 400px;
+    margin-right: 50px;
+}
+
+.weights-chart-container h3 {
+    text-align: center;
+    margin-bottom: 15px;
+    font-size: 1.1em;
+}
+
+.high-relevance-modal {
+    display: none;
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.high-relevance-modal.show {
+    display: block;
+    opacity: 1;
+}
+
+.high-relevance-modal-content {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    max-width: 400px;
+    direction: rtl;
+    font-family: 'Heebo', sans-serif;
+}
+
+.high-relevance-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.high-relevance-header h3 {
+    margin: 0;
+    color: #3F4D57;
+    font-size: 1.1rem;
+}
+
+.close-relevance {
+    cursor: pointer;
+    font-size: 1.5rem;
+    color: #666;
+}
+
+.high-relevance-theorems {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.high-relevance-theorem {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 8px;
+}
+
+.high-relevance-theorem:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+#finishModal p {
+    font-size: 18px;
+    margin-top: 1em;
+}
+
+.feedback-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+    margin: 2rem;
+    max-width: 400px;
+    width: 80%;
+}
+
+.feedback-btn {
+    padding: 1rem 2rem;
+    border-radius: 0.5rem;
+    border: 1px solid #eee;
+    background-color: white;
+    cursor: pointer;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+    text-align: right;
+    position: relative;
+    color: #3F4D57;
+    overflow: hidden;
+}
+
+.feedback-btn::before {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    height: 100%;
+    width: 4px;
+    transition: all 0.3s ease;
+}
+
+.feedback-btn i {
+    font-size: 1.2rem;
+}
+
+.feedback-btn.success::before {
+    background-color: #75975e;
+}
+
+.feedback-btn.partial::before {
+    background-color: #4169e1;
+}
+
+.feedback-btn.give-up::before {
+    background-color: #dc3545;
+}
+
+.feedback-btn.cancel::before {
+    background-color: #6c757d;
+}
+
+.feedback-btn:hover {
+    background-color: #f8f9fa;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.feedback-btn:hover::before {
+    width: 6px;
+}
+
+/* Icon styles */
+.feedback-btn i {
+    font-size: 1.2rem;
+    color: #666;
+    transition: all 0.3s ease;
+}
+
+.feedback-btn:hover i {
+    color: inherit;
+}

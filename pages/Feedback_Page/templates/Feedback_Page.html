@@ -1,0 +1,150 @@
+<!--
+Feedback_Page.html-->
+<!--&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;-->
+<!--Description:-->
+<!--    Template for collecting user feedback on the Geometric Learning System.-->
+<!--    Includes sections for usability, educational value, and open-ended feedback.-->
+
+<!--Author: Karin Hershko and Afik Dadon-->
+<!--Date: February 2025
+-->
+
+
+{% extends "base.html" %}
+
+{% block css %}
+<link rel="stylesheet" href="{{ url_for('feedback_page.static', filename='css/Feedback_Page.css') }}">
+{% endblock %}
+
+
+{% block content %}
+<div class="feedback-container">
+   <h1>משוב על המערכת</h1>
+   <form id="feedbackForm" class="feedback-form">
+       <!-- Usability Questions -->
+       <section class="feedback-section">
+           <h2>חוויה כללית</h2>
+           <p class="scale-description">דרג מ-1 (לא מסכים כלל) עד 5 (מסכים מאוד)</p>
+
+           <div class="rating-question">
+               <label>המערכת הייתה קלה לשימוש</label>
+               <div class="rating-scale">
+                   {% for i in range(1, 6) %}
+                   <div class="rating-option">
+                       <input type="radio" name="usability_easy_to_use" value="{{ i }}" id="easy_{{ i }}" required>
+                       <label for="easy_{{ i }}">{{ i }}</label>
+                   </div>
+                   {% endfor %}
+               </div>
+           </div>
+
+           <div class="rating-question">
+               <label>השאלות היו ברורות ומובנות</label>
+               <div class="rating-scale">
+                   {% for i in range(1, 6) %}
+                   <div class="rating-option">
+                       <input type="radio" name="usability_clear_questions" value="{{ i }}" id="clear_{{ i }}" required>
+                       <label for="clear_{{ i }}">{{ i }}</label>
+                   </div>
+                   {% endfor %}
+               </div>
+           </div>
+       </section>
+
+       <!-- Educational Value -->
+       <section class="feedback-section">
+           <h2>תרומה ללמידה</h2>
+           <p class="scale-description">דרג מ-1 (לא מסכים כלל) עד 5 (מסכים מאוד)</p>
+           <div class="rating-question">
+               <label>השאלות הפכו רלוונטיות יותר ככל שהתקדמתי במענה</label>
+               <div class="rating-scale">
+                   {% for i in range(1, 6) %}
+                   <div class="rating-option">
+                       <input type="radio" name="intelligence_relevant_questions" value="{{ i }}" id="relevant_{{ i }}" required>
+                       <label for="relevant_{{ i }}">{{ i }}</label>
+                   </div>
+                   {% endfor %}
+               </div>
+           </div>
+
+           <div class="rating-question">
+               <label>המשפטים שהוצעו היו רלוונטיים לבעיה שלי</label>
+               <div class="rating-scale">
+                   {% for i in range(1, 6) %}
+                   <div class="rating-option">
+                       <input type="radio" name="educational_theorems" value="{{ i }}" id="theorem_{{ i }}" required>
+                       <label for="theorem_{{ i }}">{{ i }}</label>
+                   </div>
+                   {% endfor %}
+               </div>
+           </div>
+
+           <div class="rating-question">
+               <label>המערכת עזרה לי להבין ולהתקדם בפתרון הבעיה</label>
+               <div class="rating-scale">
+                   {% for i in range(1, 6) %}
+                   <div class="rating-option">
+                       <input type="radio" name="educational_guidance" value="{{ i }}" id="guidance_{{ i }}" required>
+                       <label for="guidance_{{ i }}">{{ i }}</label>
+                   </div>
+                   {% endfor %}
+               </div>
+           </div>
+
+            <div class="choice-question">
+               <label>האם היית משתמש במערכת שוב לפתירת בעיות בגיאומטריה?</label>
+               <div class="choice-options">
+                   <div class="choice-option">
+                       <input type="radio" name="format_would_use_again" value="כן" id="again_yes" required>
+                       <label for="again_yes">כן</label>
+                   </div>
+                   <div class="choice-option">
+                       <input type="radio" name="format_would_use_again" value="חלקית" id="again_partial">
+                       <label for="again_partial">חלקית</label>
+                   </div>
+                   <div class="choice-option">
+                       <input type="radio" name="format_would_use_again" value="לא" id="again_no">
+                       <label for="again_no">לא</label>
+                   </div>
+               </div>
+           </div>
+       </section>
+
+       <!-- Open Questions -->
+      <section class="feedback-section">
+           <h2>משוב לשיפור</h2>
+
+           <div class="text-question">
+               <label for="missing_questions">אילו שאלות לדעתך היו חסרות במערכת שיכלו לעזור לך להתקדם לפתרון?</label>
+               <textarea id="missing_questions" name="missing_questions" rows="3"></textarea>
+           </div>
+
+           <div class="text-question">
+               <label for="unclear_questions">אילו שאלות היו לא ברורות או קשות להבנה, וכיצד לדעתך ניתן לשפר אותן?</label>
+               <textarea id="unclear_questions" name="unclear_questions" rows="3"></textarea>
+           </div>
+       </section>
+
+       <div class="form-actions">
+           <button type="submit" class="submit-btn">שלח משוב</button>
+       </div>
+   </form>
+  <div class="error-message" style="display: none;">
+       אירעה שגיאה בשליחת המשוב. אנא נסה שוב.
+   </div>
+
+   <div id="thankYouModal" class="modal">
+       <div class="modal-content text-center">
+           <h2>תודה רבה!</h2>
+           <p>אנו מודים לך על הזמן שהקדשת למילוי המשוב.</p>
+           <p>המשוב שלך יעזור לנו לשפר את המערכת.</p>
+           <img src="/static/media/Many thanks.png" alt="תודה" class="thanks-image">
+       </div>
+   </div>
+</div>
+{% endblock %}
+
+
+{% block scripts %}
+<script src="{{ url_for('feedback_page.static', filename='js/Feedback_Page.js') }}"></script>
+{% endblock %}

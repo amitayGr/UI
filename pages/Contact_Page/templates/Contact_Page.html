@@ -1,0 +1,102 @@
+<!--
+Contact_Page.html-->
+<!--&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;&#45;-->
+<!--Description:-->
+<!--    Template for the contact form page of the Geometric Learning System.-->
+<!--    Provides a user-friendly interface for sending messages and feedback.-->
+
+<!--Author: Karin Hershko and Afik Dadon-->
+<!--Date: February 2025
+-->
+
+
+{% extends "base.html" %}
+
+{% block css %}
+<link rel="stylesheet" href="{{ url_for('contact_page.static', filename='css/Contact_Page.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="contact-container">
+    <div class="header-section">
+        <div class="title-container">
+            <h1>צור קשר</h1>
+            <p class="subtitle">נשמח לשמוע ממך! מלא את הפרטים ונחזור אליך בהקדם</p>
+        </div>
+        <img src="{{ url_for('static', filename='media/let me know.png') }}"
+             alt="Contact Us"
+             class="contact-image">
+    </div>
+
+    <div class="contact-box">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-message flash-{{ category }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form action="{{ url_for('contact_page.submit') }}" method="POST" id="contactForm">
+            <div class="form-group">
+                <label for="name">
+                    <i class="fas fa-user"></i> שם מלא
+                </label>
+                <input type="text"
+                       id="name"
+                       name="name"
+                       value="{{ user.first_name + ' ' + user.last_name if user else '' }}"
+                       required>
+            </div>
+
+            <div class="form-group">
+                <label for="email">
+                    <i class="fas fa-envelope"></i> אימייל
+                </label>
+                <input type="email"
+                       id="email"
+                       name="email"
+                       value="{{ user.email if user else '' }}"
+                       required>
+            </div>
+
+            <div class="form-group">
+                <label for="subject">
+                    <i class="fas fa-tag"></i> נושא
+                </label>
+                <input type="text"
+                       id="subject"
+                       name="subject"
+                       required>
+            </div>
+
+            <div class="form-group">
+                <label for="message">
+                    <i class="fas fa-comment"></i> הודעה
+                </label>
+                <textarea id="message"
+                          name="message"
+                          rows="5"
+                          required></textarea>
+            </div>
+
+            <button type="submit" id="submitBtn">
+                <span class="button-content">
+                    <i class="fas fa-paper-plane"></i>
+                    שלח הודעה
+                </span>
+                <span class="loading-spinner">
+                    <i class="fas fa-circle-notch fa-spin"></i>
+                </span>
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('contact_page.static', filename='js/Contact_Page.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,67 @@
+<!--
+Login_Page.html-->
+
+<!--Description:-->
+<!--    Main login template for the Geometric Learning System.-->
+<!--    Provides user authentication interface with email and password inputs,-->
+<!--    registration redirect, and password recovery options.-->
+
+<!--Author: Karin Hershko and Afik Dadon-->
+<!--Date: February 2025
+-->
+
+
+{% extends "base.html" %}
+
+{# Stylesheet imports #}
+{% block css %}
+<link rel="stylesheet" href="{{ url_for('login_page.static', filename='css/Login_Page.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    {# Login Image Section #}
+    <div class="login-image-section">
+        <img src="{{ url_for('static', filename='media/login.png') }}" alt="Login Image" />
+    </div>
+
+    {# Login Form Section #}
+    <div class="login-form">
+        <h1>התחברות למערכת</h1>
+        <form method="POST" action="{{ url_for('login_page.login') }}" id="loginForm" novalidate>
+            {# Email Input #}
+            <div class="form-group">
+                <label for="email">אימייל</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+
+            {# Password Input with Toggle #}
+            <div class="form-group">
+                <label for="password">סיסמה</label>
+                <div class="password-container">
+                    <input type="password" id="password" name="password" required>
+                    <button type="button" class="toggle-password">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+
+            {# Submit Button #}
+            <button type="submit" class="login-button">התחבר</button>
+        </form>
+
+        {# Additional Navigation Options #}
+        <div class="additional-options">
+            <a href="{{ url_for('registration_page.register') }}" class="register-link">עדיין לא רשום? הירשם כאן</a>
+            <br>
+            <a href="{{ url_for('login_page.forgot_password') }}" class="forgot-password-link">שכחת סיסמה?</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{# JavaScript imports #}
+{% block scripts %}
+<script src="{{ url_for('login_page.static', filename='js/Login_Page.js') }}"></script>
+{% endblock %}
