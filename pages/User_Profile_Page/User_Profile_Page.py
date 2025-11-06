@@ -5,20 +5,25 @@ Description:
     A Flask Blueprint that handles user profile functionality. This component manages
     user statistics, activity history, and admin-specific analytics. It provides
     different views and data based on user roles.
+    
+    Updated to use API client for geometry learning data while maintaining
+    local user statistics and activity tracking.
 
 Main Components:
     - User Statistics: Tracks user engagement and activity
     - Activity History: Shows recent user actions
     - Admin Dashboard: System-wide analytics and management tools
-    - Question Analytics: Usage statistics for questions
-    - Theorem Database: Management of geometric theorems
+    - Question Analytics: Usage statistics via API
+    - Theorem Database: Management via API
 
 Author: Karin Hershko and Afik Dadon
 Date: February 2025
+Updated: November 2025 - API Integration
 """
 
 from flask import Blueprint, render_template, session, redirect, url_for
 from db_utils import get_db_connection
+from api_client import api_client
 
 user_profile_page = Blueprint('user_profile_page', __name__,
                               template_folder='templates',
@@ -99,8 +104,8 @@ def _get_recent_activity(cursor, user):
 
 
 def _get_admin_statistics(cursor):
-    """Get system-wide statistics for admin dashboard."""
-    # Get system overview statistics
+    """Get system-wide statistics for admin dashboard with API integration."""
+    # Get system overview statistics from local database
     cursor.execute("""
         SELECT 
             (SELECT COUNT(*) FROM Users) as total_users,
@@ -118,37 +123,39 @@ def _get_admin_statistics(cursor):
     """)
     system_stats = cursor.fetchone()
 
-    # Get question analytics
+    # Get geometry learning statistics from API
+    api_stats = None
+    theorems_data = []
+    try:
+        # Get session statistics from API
+        api_stats = api_client.get_session_statistics()
+        
+        # Get theorems data from API
+        theorems_response = api_client.get_all_theorems(active_only=True)
+        theorems_data = theorems_response.get('theorems', [])
+        
+    except Exception as e:
+        print(f"Failed to get API statistics: {str(e)}")
+
+    # Question analytics is still from local logs for now
+    # This could be enhanced to use API data in the future
     cursor.execute("""
         SELECT 
-            q.question_id,
-            CAST(q.question_text AS VARCHAR(MAX)) as question_text,
-            q.difficulty_level,
-            COUNT(DISTINCT ul.user_id) as unique_users,
-            (SELECT COUNT(*) 
-             FROM UserLogs 
-             WHERE action_type = 'QUESTION_ANSWER' 
-             AND JSON_VALUE(action_data, '$.question_id') = CAST(q.question_id as VARCHAR)) as total_asked
-        FROM Questions q
-        LEFT JOIN UserLogs ul ON ul.action_type = 'QUESTION_ANSWER' 
-            AND JSON_VALUE(ul.action_data, '$.question_id') = CAST(q.question_id as VARCHAR)
-        WHERE q.active = 1
-        GROUP BY q.question_id, CAST(q.question_text AS VARCHAR(MAX)), q.difficulty_level
+            ISNULL(JSON_VALUE(action_data, '$.question_id'), 'unknown') as question_id,
+            'N/A' as question_text,
+            'N/A' as difficulty_level,
+            COUNT(DISTINCT user_id) as unique_users,
+            COUNT(*) as total_asked
+        FROM UserLogs
+        WHERE action_type = 'QUESTION_ANSWER'
+        GROUP BY JSON_VALUE(action_data, '$.question_id')
         ORDER BY total_asked DESC
     """)
     question_analytics = cursor.fetchall()
 
-    # Get theorems data
-    cursor.execute("""
-        SELECT t.theorem_id, t.theorem_text, t.category
-        FROM Theorems t
-        WHERE t.active = 1
-        ORDER BY t.theorem_id
-    """)
-    theorems_data = cursor.fetchall()
-
     return {
         'system_stats': system_stats,
+        'api_stats': api_stats,
         'question_analytics': question_analytics,
         'theorems': theorems_data
     }
@@ -156,10 +163,17 @@ def _get_admin_statistics(cursor):
 
 def _render_fallback_profile(user):
     """Render profile page with fallback data in case of errors."""
+    fallback_admin_stats = None
+    if user['role'] == 'admin':
+        fallback_admin_stats = {
+            'system_stats': (0, 0, 0, 0),
+            'api_stats': None,
+            'theorems': [],
+            'question_analytics': []
+        }
+    
     return render_template('User_Profile_Page.html',
                            user=user,
                            user_stats=(0, 0, 0),
                            recent_activity=None,
-                           admin_stats={'system_stats': (0, 0, 0, 0),
-                                        'theorems': [],
-                                        'question_analytics': []} if user['role'] == 'admin' else None)
+                           admin_stats=fallback_admin_stats)

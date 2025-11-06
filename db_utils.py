@@ -3,17 +3,21 @@ db_utils.py
 -----------
 Description:
     Database utility functions for the Geometric Learning System. This module handles
-    all database connections and user authentication operations, providing a clean
-    interface for database interactions throughout the application.
+    user authentication operations for the UI application, while geometry learning
+    operations are now handled through the API client for localhost:17654.
 
 Main Components:
-    - Database Connection Management
+    - Database Connection Management (for user data)
     - User Authentication
     - User Creation and Management
     - Password Hashing and Verification
 
+Note: Geometry learning data (questions, theorems, sessions) is now accessed
+      through the API client (api_client.py) instead of direct database access.
+
 Author: Karin Hershko and Afik Dadon
 Date: February 2025
+Updated: November 2025 - API Integration
 """
 
 import pyodbc
@@ -23,7 +27,12 @@ from typing import Optional, Dict
 
 
 def get_db_connection():
-    """Create and return a connection to the database using configuration parameters."""
+    """
+    Create and return a connection to the user database using configuration parameters.
+    
+    Note: This is used for user authentication data only. Geometry learning data
+    is accessed through the API client.
+    """
     conn_str = (
         f"DRIVER={{{DB_CONFIG['driver']}}};"
         f"SERVER={DB_CONFIG['server']};"
@@ -35,11 +44,17 @@ def get_db_connection():
 
 # Hash password לפני שמכניסים ל‑DB
 def hash_password(password: str) -> str:
-    """Hash a password using Flask-Bcrypt."""
+    """Hash a password using Flask-Bcrypt for user authentication."""
     return bcrypt.generate_password_hash(password).decode('utf-8')  # חובה decode ל־utf-8
 
-# Verify password
+# Verify password for user authentication
 def verify_user(email: str, password: str) -> Optional[Dict]:
+    """
+    Verify user credentials for UI authentication.
+    
+    Note: This handles UI user authentication only. Geometry learning sessions
+    are managed through the API client.
+    """
     password = password.strip()
     try:
         with get_db_connection() as conn:
@@ -72,7 +87,7 @@ def verify_user(email: str, password: str) -> Optional[Dict]:
         return None
 
 def create_user(first_name: str, last_name: str, email: str, password: str) -> bool:
-    """Create a new user in the database with hashed password."""
+    """Create a new user in the database with hashed password for UI authentication."""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -102,7 +117,7 @@ def create_user(first_name: str, last_name: str, email: str, password: str) -> b
         return False
 
 def verify_email_exists(email: str) -> bool:
-    """Check if an email address already exists in the database."""
+    """Check if an email address already exists in the user database."""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -125,6 +140,21 @@ def update_last_login(user_id: int) -> None:
             conn.commit()
     except Exception as e:
         print(f"Error updating last login: {str(e)}")
+
+
+# === Geometry Learning Data Access ===
+# 
+# Note: Geometry learning operations (questions, theorems, sessions) are now 
+# handled through the API client. Use api_client.py for:
+# 
+# - Questions: api_client.get_first_question(), get_next_question()
+# - Answers: api_client.submit_answer()
+# - Theorems: api_client.get_all_theorems(), get_relevant_theorems()
+# - Sessions: api_client.start_session(), end_session()
+# - Statistics: api_client.get_session_statistics()
+# 
+# The functions below are kept for compatibility but should be migrated
+# to use the API client for new development.
 
 
 # 🔹 בדיקה שה-hash עובד

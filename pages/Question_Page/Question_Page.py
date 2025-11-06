@@ -5,6 +5,8 @@ Description:
     Core controller for the question interface of the Geometric Learning System.
     Manages question presentation, answer processing, session handling, and
     provides real-time feedback through dynamic theorem suggestions.
+    
+    Updated to use the centralized API client for localhost:17654 communication.
 
 Routes:
     - /: Main question interface
@@ -15,10 +17,11 @@ Routes:
 
 Author: Karin Hershko and Afik Dadon
 Date: February 2025
+Updated: November 2025 - API Integration
 """
 
 from flask import Blueprint, render_template, session, jsonify, request, redirect, url_for
-from pages.Question_Page.Geometry_Manager import Geometry_Manager
+from api_client import api_client
 from UserLogger import UserLogger
 
 # Blueprint Configuration
@@ -32,11 +35,21 @@ question_page = Blueprint(
 
 @question_page.before_request
 def check_active_session():
-    """Middleware to ensure session state is initialized.
-    Resets session if no geometry state exists."""
-    if 'geometry_state' not in session:
-        manager = Geometry_Manager()
-        manager.reset_session()
+    """Middleware to ensure API session state is initialized.
+    Creates a new API session if one doesn't exist."""
+    try:
+        # Check if we have an active API session
+        api_status = api_client.get_session_status()
+        if not api_status.get('active', False):
+            # Start a new API session
+            api_client.start_session()
+    except Exception as e:
+        # If API is not available or session creation fails, start a new one
+        try:
+            api_client.start_session()
+        except Exception as start_error:
+            print(f"Failed to start API session: {str(start_error)}")
+            # Continue with local fallback if needed
 
 
 @question_page.route('/')
@@ -50,14 +63,28 @@ def question():
         return redirect(url_for('login_page.login'))
 
     try:
-        manager = Geometry_Manager()
-        manager.reset_session()
+        # Start a new API session and get the first question
+        api_client.start_session()
         UserLogger.log_session_start("NEW_SESSION")
 
-        question_id, question_text, debug_info = manager.get_next_question(
-            is_admin=(user_role == 'admin')
-        )
-        initial_theorems = manager.get_relevant_theorems()
+        # Get first question from API
+        question_data = api_client.get_first_question()
+        question_id = question_data.get('question_id')
+        question_text = question_data.get('question_text')
+
+        # For admin users, get debug information (if available via API)
+        debug_info = None
+        if user_role == 'admin':
+            try:
+                # Try to get session status for debug info
+                status = api_client.get_session_status()
+                debug_info = status.get('state', {})
+            except Exception:
+                debug_info = None
+
+        # Get answer options from API
+        answer_options = api_client.get_answer_options()
+        answers = answer_options.get('answers', [])
 
         return render_template(
             'Question_Page.html',
@@ -65,7 +92,8 @@ def question():
             question_id=question_id,
             question_text=question_text,
             debug_info=debug_info,
-            initial_theorems=initial_theorems
+            answer_options=answers,
+            initial_theorems=[]  # Will be populated after first answer
         )
     except Exception as e:
         print(f"Error in question route: {str(e)}")
@@ -74,45 +102,72 @@ def question():
 
 @question_page.route('/answer', methods=['POST'])
 def process_answer():
-    """ Process user's answer to current question."""
+    """Process user's answer to current question using the API."""
     data = request.get_json()
     question_id = data.get('question_id')
     answer = data.get('answer')
 
     try:
-        manager = Geometry_Manager()
-        manager.process_answer(question_id, answer)
+        # Convert answer text to answer_id if necessary
+        # The API expects answer_id (0-3), but UI might send text
+        answer_id = answer
+        if isinstance(answer, str):
+            # Map answer text to ID based on API documentation
+            answer_mapping = {
+                'לא': 0,
+                'כן': 1, 
+                'לא יודע': 2,
+                'כנראה': 3
+            }
+            answer_id = answer_mapping.get(answer, 2)  # Default to "לא יודע"
 
-        next_question_id, next_question_text, debug_info = manager.get_next_question(
-            is_admin=(session.get('user', {}).get('role') == 'admin')
-        )
+        # Submit answer to API
+        answer_result = api_client.submit_answer(question_id, answer_id)
+        
+        UserLogger.log_question_answer(question_id, f"Answer ID: {answer_id}", answer)
 
-        questions_history = manager.get_questions_history()
-        UserLogger.log_question_answer(question_id, next_question_text, answer)
+        # Get next question from API
+        try:
+            next_question_data = api_client.get_next_question()
+            next_question_id = next_question_data.get('question_id')
+            next_question_text = next_question_data.get('question_text')
+        except Exception:
+            # If no more questions available, end session
+            next_question_id = None
+            next_question_text = None
 
+        # Get relevant theorems from answer submission result
+        relevant_theorems = answer_result.get('relevant_theorems', [])
+        
         # Format theorems for response
-        theorems = manager.get_relevant_theorems()
         formatted_theorems = [{
-            'id': theorem[0],
-            'text': theorem[1],
-            'weight': theorem[2],
-            'category': theorem[0] if len(theorem) < 4 else theorem[3]
-        } for theorem in theorems]
+            'id': theorem.get('theorem_id'),
+            'text': theorem.get('theorem_text'),
+            'weight': theorem.get('weight', 0),
+            'category': theorem.get('category', 0),
+            'combined_score': theorem.get('combined_score', 0)
+        } for theorem in relevant_theorems]
+
+        # Get updated weights from answer result
+        updated_weights = answer_result.get('updated_weights', {})
 
         response_data = {
             'success': True,
             'nextQuestion': {
                 'id': next_question_id,
                 'text': next_question_text
-            },
-            'questionsHistory': questions_history,
+            } if next_question_id else None,
             'theorems': formatted_theorems,
-            'triangle_weights': session['geometry_state']['triangle_weights']
+            'triangle_weights': updated_weights
         }
 
         # Add debug info for admin users
         if session.get('user', {}).get('role') == 'admin':
-            response_data['debug'] = debug_info
+            try:
+                status = api_client.get_session_status()
+                response_data['debug'] = status.get('state', {})
+            except Exception:
+                pass
 
         return jsonify(response_data)
 
@@ -123,17 +178,31 @@ def process_answer():
 
 @question_page.route('/finish', methods=['POST'])
 def finish_session():
-    """Handle session completion and cleanup. """
+    """Handle session completion and cleanup using the API."""
     try:
         data = request.get_json()
         status = data.get('status', 'unknown')
+        feedback_id = data.get('feedback_id')  # Optional feedback
+        triangle_types = data.get('triangle_types')  # Optional
+        helpful_theorems = data.get('helpful_theorems')  # Optional
 
         user = session.get('user')
         if not user:
             return jsonify({'success': False, 'error': 'Not authenticated'}), 401
 
+        # End the API session with optional feedback
+        try:
+            api_client.end_session(
+                feedback=feedback_id,
+                triangle_types=triangle_types,
+                helpful_theorems=helpful_theorems,
+                save_to_db=True
+            )
+        except Exception as api_error:
+            print(f"API session end failed: {str(api_error)}")
+            # Continue with local cleanup
+
         UserLogger.log_session_end(status, None)
-        session.pop('geometry_state', None)
 
         redirect_url = (url_for('question_page.question')
                         if status == 'partial'
@@ -154,12 +223,14 @@ def cleanup_session():
     try:
         user_data = session.get('user')
 
-        # Get final theorem before cleanup
-        manager = Geometry_Manager()
-        theorems = manager.get_relevant_theorems()
-        final_theorem_id = theorems[0][0] if theorems else None
+        # End the API session if active
+        try:
+            api_client.end_session(save_to_db=False)  # Don't save on cleanup
+        except Exception as api_error:
+            print(f"API cleanup failed: {str(api_error)}")
+            # Continue with local cleanup
 
-        # Clear session data except user authentication
+        # Clear local Flask session data except user authentication
         for key in list(session.keys()):
             if key != 'user':
                 session.pop(key, None)
@@ -168,7 +239,7 @@ def cleanup_session():
             session['user'] = user_data
             session.modified = True
 
-        UserLogger.log_session_end("CLEANUP", final_theorem_id)
+        UserLogger.log_session_end("CLEANUP", None)
         return jsonify({'success': True})
 
     except Exception as e:
@@ -178,11 +249,14 @@ def cleanup_session():
 
 @question_page.route('/check-timeout', methods=['GET'])
 def check_timeout():
-    """ Check if current session has timed out. """
+    """Check if current session has timed out using API."""
     try:
-        manager = Geometry_Manager()
-        is_timeout = manager.check_timeout()
-        return jsonify({'timeout': is_timeout})
+        # Check API session status
+        status = api_client.get_session_status()
+        is_active = status.get('active', False)
+        
+        # If API session is not active, consider it timed out
+        return jsonify({'timeout': not is_active})
     except Exception as e:
         print(f"Error in check_timeout route: {str(e)}")
-        return jsonify({'timeout': False, 'error': str(e)}), 500
+        return jsonify({'timeout': True, 'error': str(e)}), 500

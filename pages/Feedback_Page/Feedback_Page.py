@@ -4,13 +4,16 @@ Feedback_Page.py
 Description:
     Handles user feedback collection for the Geometric Learning System.
     Manages feedback form display and submission processing.
+    
+    Updated to use the centralized API client for localhost:17654 communication.
 
 Author: Karin Hershko and Afik Dadon
 Date: February 2025
+Updated: November 2025 - API Integration
 """
 
 from flask import Blueprint, render_template, request, redirect, url_for, session, jsonify
-from db_utils import get_db_connection
+from api_client import api_client
 from UserLogger import UserLogger
 from typing import Dict, Union
 import logging
@@ -31,13 +34,34 @@ def feedback() -> Union[str, redirect]:
     user = session.get('user', None)
     if not user:
         return redirect(url_for('login_page.login'))
-    return render_template('Feedback_Page.html')
+    
+    try:
+        # Get feedback options from API
+        feedback_options = api_client.get_feedback_options()
+        options = feedback_options.get('feedback_options', [])
+        
+        # Get triangle types for the form
+        triangle_types = api_client.get_triangle_types()
+        triangles = triangle_types.get('triangles', [])
+        
+        # Get theorems for helpful theorems selection
+        theorems_data = api_client.get_all_theorems(active_only=True)
+        theorems = theorems_data.get('theorems', [])
+        
+        return render_template('Feedback_Page.html', 
+                             feedback_options=options,
+                             triangle_types=triangles,
+                             theorems=theorems)
+    except Exception as e:
+        logger.error(f"Error loading feedback page: {str(e)}")
+        # Fallback to basic page without API data
+        return render_template('Feedback_Page.html')
 
 
 @feedback_page.route('/submit', methods=['POST'])
 def submit_feedback() -> jsonify:
     """Process feedback form submission.
-    Validates input and stores in database."""
+    Validates input and stores via API and local database."""
     try:
         # Validate user session
         if not _validate_user_session():
@@ -55,7 +79,25 @@ def submit_feedback() -> jsonify:
                 'error': 'No feedback data received'
             }), 400
 
-        # Save feedback to database
+        # Check if this is API-specific feedback (geometry learning session feedback)
+        api_feedback_id = data.get('api_feedback_id')  # 4-7 as per API docs
+        triangle_types = data.get('triangle_types', [])
+        helpful_theorems = data.get('helpful_theorems', [])
+
+        # Submit to API if it's geometry learning feedback
+        if api_feedback_id is not None:
+            try:
+                api_result = api_client.submit_feedback(
+                    feedback=api_feedback_id,
+                    triangle_types=triangle_types,
+                    helpful_theorems=helpful_theorems
+                )
+                logger.info(f"API feedback submitted successfully: {api_result}")
+            except Exception as api_error:
+                logger.warning(f"API feedback submission failed: {str(api_error)}")
+                # Continue with local storage even if API fails
+
+        # Save to local database for comprehensive feedback (UI-specific data)
         _save_feedback_to_db(data)
 
         # Log successful submission
@@ -89,9 +131,12 @@ def _validate_user_session() -> bool:
 
 
 def _save_feedback_to_db(data: Dict) -> None:
-    """Save feedback data to database."""
+    """Save feedback data to local database."""
     user_id = session['user']['user_id']
 
+    # Import here to avoid circular imports
+    from db_utils import get_db_connection
+    
     with get_db_connection() as conn:
         cursor = conn.cursor()
 
