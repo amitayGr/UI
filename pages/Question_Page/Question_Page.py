@@ -33,6 +33,14 @@ question_page = Blueprint(
 )
 
 
+@question_page.after_request
+def after_request(response):
+    """Clean up API client session after each request."""
+    # This ensures thread-local sessions are properly cleaned up
+    # helping to prevent SQLite threading issues
+    return response
+
+
 @question_page.before_request
 def check_active_session():
     """Middleware to ensure API session state is initialized.

@@ -20,6 +20,7 @@ import requests
 from typing import Dict, List, Optional, Any, Union, Tuple
 from flask import session as flask_session
 import logging
+import threading
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -29,27 +30,55 @@ class APIClient:
     """
     Centralized client for interacting with the Geometry Learning System API.
     Handles all HTTP communications with the API server on localhost:17654.
+    Uses thread-local storage to ensure thread-safety with SQLite-based API.
     """
     
     def __init__(self):
         """Initialize API client with base configuration."""
         # Updated base URL to point to localhost:17654 as requested
         self.base_url = "http://localhost:17654/api"
-        self.session = requests.Session()
         
-        # Set default headers
-        self.session.headers.update({
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        })
+        # Use thread-local storage for requests sessions
+        # This ensures each thread gets its own session object
+        self._local = threading.local()
         
-        # Store session cookies from Flask session
-        self._sync_session_cookies()
+    @property
+    def session(self):
+        """Get or create a thread-local requests session."""
+        if not hasattr(self._local, 'session'):
+            self._local.session = requests.Session()
+            # Set default headers for this thread's session
+            self._local.session.headers.update({
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            })
+        return self._local.session
+    @property
+    def session(self):
+        """Get or create a thread-local requests session."""
+        if not hasattr(self._local, 'session'):
+            self._local.session = requests.Session()
+            # Set default headers for this thread's session
+            self._local.session.headers.update({
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            })
+        return self._local.session
     
     def _sync_session_cookies(self):
         """Synchronize Flask session cookies with requests session."""
         # Note: The API uses its own session management, so we'll let it handle cookies
         pass
+    
+    def close_session(self):
+        """Close the thread-local session if it exists."""
+        if hasattr(self._local, 'session'):
+            try:
+                self._local.session.close()
+            except Exception as e:
+                logger.warning(f"Error closing session: {str(e)}")
+            finally:
+                delattr(self._local, 'session')
     
     def _handle_response(self, response: requests.Response) -> Dict[str, Any]:
         """
