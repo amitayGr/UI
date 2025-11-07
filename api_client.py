@@ -21,20 +21,68 @@ from typing import Dict, List, Optional, Any, Union, Tuple
 from flask import session as flask_session
 import logging
 import threading
+from functools import lru_cache
+from datetime import datetime, timedelta
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Performance optimization: Simple cache for static data
+class SimpleCache:
+    """Thread-safe cache with TTL (Time To Live) support."""
+    
+    def __init__(self):
+        self._cache = {}
+        self._lock = threading.Lock()
+        self._timestamps = {}
+    
+    def get(self, key: str, ttl_seconds: int = 300) -> Optional[Any]:
+        """Get cached value if it exists and hasn't expired."""
+        with self._lock:
+            if key in self._cache:
+                timestamp = self._timestamps.get(key)
+                if timestamp and (datetime.now() - timestamp).seconds < ttl_seconds:
+                    return self._cache[key]
+                else:
+                    # Expired, remove from cache
+                    del self._cache[key]
+                    del self._timestamps[key]
+            return None
+    
+    def set(self, key: str, value: Any):
+        """Set cached value with current timestamp."""
+        with self._lock:
+            self._cache[key] = value
+            self._timestamps[key] = datetime.now()
+    
+    def clear(self):
+        """Clear all cached data."""
+        with self._lock:
+            self._cache.clear()
+            self._timestamps.clear()
+
+# Global cache instance
+_cache = SimpleCache()
 
 class APIClient:
     """
     Centralized client for interacting with the Geometry Learning System API.
     Handles all HTTP communications with the API server on localhost:17654.
     Uses thread-local storage to ensure thread-safety with SQLite-based API.
+    
+    Performance Optimizations:
+    - Connection pooling for faster requests
+    - Automatic retries with exponential backoff
+    - Caching for static data (theorems, answer options, etc.)
+    - Reduced timeouts for faster failure detection
+    - Keep-alive connections
     """
     
     def __init__(self):
-        """Initialize API client with base configuration."""
+        """Initialize API client with base configuration and performance optimizations."""
         # Updated base URL to point to localhost:17654 as requested
         self.base_url = "http://localhost:17654/api"
         
@@ -42,16 +90,46 @@ class APIClient:
         # This ensures each thread gets its own session object
         self._local = threading.local()
         
+        # Performance settings
+        self.default_timeout = 3  # Reduced from default 30s for faster failure detection
+        self.cache_enabled = True  # Enable caching for static data
+        
+    def _create_session(self) -> requests.Session:
+        """Create a new requests session with optimizations."""
+        session = requests.Session()
+        
+        # Set default headers for this thread's session
+        session.headers.update({
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Connection': 'keep-alive'  # Enable keep-alive for connection reuse
+        })
+        
+        # Configure connection pooling and retry strategy
+        retry_strategy = Retry(
+            total=2,  # Reduced retries for faster failure
+            backoff_factor=0.1,  # Quick exponential backoff
+            status_forcelist=[500, 502, 503, 504],  # Retry on server errors
+            allowed_methods=["GET", "POST"]  # Retry safe methods
+        )
+        
+        adapter = HTTPAdapter(
+            pool_connections=10,  # Number of connection pools
+            pool_maxsize=20,  # Max connections per pool
+            max_retries=retry_strategy,
+            pool_block=False  # Don't block when pool is full
+        )
+        
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+        
+        return session
+        
     @property
     def session(self):
         """Get or create a thread-local requests session."""
         if not hasattr(self._local, 'session'):
-            self._local.session = requests.Session()
-            # Set default headers for this thread's session
-            self._local.session.headers.update({
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            })
+            self._local.session = self._create_session()
         return self._local.session
     @property
     def session(self):
@@ -113,6 +191,28 @@ class APIClient:
         except requests.exceptions.RequestException as e:
             raise Exception(f"Request failed: {str(e)}")
     
+    def _get_cached_or_fetch(self, cache_key: str, fetch_func, ttl_seconds: int = 300):
+        """
+        Get data from cache or fetch it if not cached.
+        
+        Args:
+            cache_key: Unique key for caching
+            fetch_func: Function to call if cache miss
+            ttl_seconds: Time to live in cache (default 5 minutes)
+        """
+        if not self.cache_enabled:
+            return fetch_func()
+        
+        cached = _cache.get(cache_key, ttl_seconds)
+        if cached is not None:
+            logger.debug(f"Cache hit: {cache_key}")
+            return cached
+        
+        logger.debug(f"Cache miss: {cache_key}")
+        result = fetch_func()
+        _cache.set(cache_key, result)
+        return result
+    
     # === Session Management ===
     
     def start_session(self) -> Dict[str, Any]:
@@ -123,7 +223,10 @@ class APIClient:
             Dictionary containing session_id and success message
         """
         try:
-            response = self.session.post(f"{self.base_url}/session/start")
+            response = self.session.post(
+                f"{self.base_url}/session/start",
+                timeout=self.default_timeout
+            )
             return self._handle_response(response)
         except Exception as e:
             logger.error(f"Failed to start session: {str(e)}")
@@ -137,7 +240,10 @@ class APIClient:
             Dictionary containing session status and state information
         """
         try:
-            response = self.session.get(f"{self.base_url}/session/status")
+            response = self.session.get(
+                f"{self.base_url}/session/status",
+                timeout=self.default_timeout
+            )
             return self._handle_response(response)
         except Exception as e:
             logger.error(f"Failed to get session status: {str(e)}")
@@ -198,7 +304,10 @@ class APIClient:
             Dictionary containing question_id and question_text
         """
         try:
-            response = self.session.get(f"{self.base_url}/questions/first")
+            response = self.session.get(
+                f"{self.base_url}/questions/first",
+                timeout=self.default_timeout
+            )
             return self._handle_response(response)
         except Exception as e:
             logger.error(f"Failed to get first question: {str(e)}")
@@ -212,7 +321,10 @@ class APIClient:
             Dictionary containing question_id, question_text, and info
         """
         try:
-            response = self.session.get(f"{self.base_url}/questions/next")
+            response = self.session.get(
+                f"{self.base_url}/questions/next",
+                timeout=self.default_timeout
+            )
             return self._handle_response(response)
         except Exception as e:
             logger.error(f"Failed to get next question: {str(e)}")
@@ -238,16 +350,24 @@ class APIClient:
     def get_answer_options(self) -> Dict[str, Any]:
         """
         Get all available answer options.
+        Uses caching since answer options are static.
         
         Returns:
             Dictionary containing list of answer options
         """
-        try:
-            response = self.session.get(f"{self.base_url}/answers/options")
-            return self._handle_response(response)
-        except Exception as e:
-            logger.error(f"Failed to get answer options: {str(e)}")
-            raise
+        def fetch():
+            try:
+                response = self.session.get(
+                    f"{self.base_url}/answers/options",
+                    timeout=self.default_timeout
+                )
+                return self._handle_response(response)
+            except Exception as e:
+                logger.error(f"Failed to get answer options: {str(e)}")
+                raise
+        
+        # Cache for 1 hour (answer options rarely change)
+        return self._get_cached_or_fetch("answer_options", fetch, ttl_seconds=3600)
     
     def submit_answer(self, question_id: int, answer_id: int) -> Dict[str, Any]:
         """
@@ -265,7 +385,11 @@ class APIClient:
                 "question_id": question_id,
                 "answer_id": answer_id
             }
-            response = self.session.post(f"{self.base_url}/answers/submit", json=data)
+            response = self.session.post(
+                f"{self.base_url}/answers/submit",
+                json=data,
+                timeout=self.default_timeout
+            )
             return self._handle_response(response)
         except Exception as e:
             logger.error(f"Failed to submit answer: {str(e)}")
@@ -277,6 +401,7 @@ class APIClient:
                         category: Optional[int] = None) -> Dict[str, Any]:
         """
         Get all theorems with optional filtering.
+        Uses caching since theorems are relatively static.
         
         Args:
             active_only: Return only active theorems
@@ -285,18 +410,29 @@ class APIClient:
         Returns:
             Dictionary containing list of theorems
         """
-        try:
-            params = {}
-            if active_only:
-                params["active_only"] = "true"
-            if category is not None:
-                params["category"] = str(category)
-                
-            response = self.session.get(f"{self.base_url}/theorems", params=params)
-            return self._handle_response(response)
-        except Exception as e:
-            logger.error(f"Failed to get theorems: {str(e)}")
-            raise
+        # Create cache key based on parameters
+        cache_key = f"theorems_active={active_only}_cat={category}"
+        
+        def fetch():
+            try:
+                params = {}
+                if active_only:
+                    params["active_only"] = "true"
+                if category is not None:
+                    params["category"] = str(category)
+                    
+                response = self.session.get(
+                    f"{self.base_url}/theorems",
+                    params=params,
+                    timeout=self.default_timeout
+                )
+                return self._handle_response(response)
+            except Exception as e:
+                logger.error(f"Failed to get theorems: {str(e)}")
+                raise
+        
+        # Cache for 10 minutes (theorems don't change often)
+        return self._get_cached_or_fetch(cache_key, fetch, ttl_seconds=600)
     
     def get_theorem_details(self, theorem_id: int) -> Dict[str, Any]:
         """
@@ -398,16 +534,24 @@ class APIClient:
     def get_feedback_options(self) -> Dict[str, Any]:
         """
         Get all available feedback options.
+        Uses caching since feedback options are static.
         
         Returns:
             Dictionary containing feedback options
         """
-        try:
-            response = self.session.get(f"{self.base_url}/feedback/options")
-            return self._handle_response(response)
-        except Exception as e:
-            logger.error(f"Failed to get feedback options: {str(e)}")
-            raise
+        def fetch():
+            try:
+                response = self.session.get(
+                    f"{self.base_url}/feedback/options",
+                    timeout=self.default_timeout
+                )
+                return self._handle_response(response)
+            except Exception as e:
+                logger.error(f"Failed to get feedback options: {str(e)}")
+                raise
+        
+        # Cache for 1 hour (feedback options rarely change)
+        return self._get_cached_or_fetch("feedback_options", fetch, ttl_seconds=3600)
     
     def submit_feedback(self, feedback: int, 
                        triangle_types: Optional[List[int]] = None,
@@ -455,16 +599,24 @@ class APIClient:
     def get_triangle_types(self) -> Dict[str, Any]:
         """
         Get all triangle types in the system.
+        Uses caching since triangle types are static.
         
         Returns:
             Dictionary containing triangle types
         """
-        try:
-            response = self.session.get(f"{self.base_url}/db/triangles")
-            return self._handle_response(response)
-        except Exception as e:
-            logger.error(f"Failed to get triangle types: {str(e)}")
-            raise
+        def fetch():
+            try:
+                response = self.session.get(
+                    f"{self.base_url}/db/triangles",
+                    timeout=self.default_timeout
+                )
+                return self._handle_response(response)
+            except Exception as e:
+                logger.error(f"Failed to get triangle types: {str(e)}")
+                raise
+        
+        # Cache for 1 hour (triangle types never change)
+        return self._get_cached_or_fetch("triangle_types", fetch, ttl_seconds=3600)
     
     def health_check(self) -> Dict[str, Any]:
         """
@@ -474,11 +626,39 @@ class APIClient:
             Dictionary containing server health status
         """
         try:
-            response = self.session.get(f"{self.base_url}/health")
+            response = self.session.get(
+                f"{self.base_url}/health",
+                timeout=self.default_timeout
+            )
             return self._handle_response(response)
         except Exception as e:
             logger.error(f"Health check failed: {str(e)}")
             raise
+    
+    def clear_cache(self):
+        """Clear all cached data. Useful when data is updated or for testing."""
+        _cache.clear()
+        logger.info("API client cache cleared")
+    
+    def set_timeout(self, timeout: int):
+        """
+        Set custom timeout for API requests.
+        
+        Args:
+            timeout: Timeout in seconds
+        """
+        self.default_timeout = timeout
+        logger.info(f"API timeout set to {timeout} seconds")
+    
+    def disable_cache(self):
+        """Disable caching for all requests."""
+        self.cache_enabled = False
+        logger.info("API caching disabled")
+    
+    def enable_cache(self):
+        """Enable caching for static data."""
+        self.cache_enabled = True
+        logger.info("API caching enabled")
 
 
 # Global API client instance
