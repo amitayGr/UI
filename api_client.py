@@ -17,10 +17,12 @@ Date: November 2025
 """
 
 import requests
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Union, Tuple
+from flask import session as flask_session
 import logging
 import threading
-from datetime import datetime
+from functools import lru_cache
+from datetime import datetime, timedelta
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -81,41 +83,64 @@ class APIClient:
     
     def __init__(self):
         """Initialize API client with base configuration and performance optimizations."""
+        # Updated base URL to point to localhost:17654 as requested
         self.base_url = "http://localhost:17654/api"
+        
+        # Use thread-local storage for requests sessions
+        # This ensures each thread gets its own session object
         self._local = threading.local()
-        # Core performance settings
-        self.default_timeout = 3
-        self.cache_enabled = True
-
+        
+        # Performance settings
+        self.default_timeout = 3  # Reduced from default 30s for faster failure detection
+        self.cache_enabled = True  # Enable caching for static data
+        
     def _create_session(self) -> requests.Session:
-        """Create a new pooled, retry-enabled requests session."""
+        """Create a new requests session with optimizations."""
         session = requests.Session()
+        
+        # Set default headers for this thread's session
         session.headers.update({
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'Connection': 'keep-alive'
+            'Connection': 'keep-alive'  # Enable keep-alive for connection reuse
         })
+        
+        # Configure connection pooling and retry strategy
         retry_strategy = Retry(
-            total=3,
-            backoff_factor=0.15,
-            status_forcelist=[500, 502, 503, 504],
-            allowed_methods=["GET", "POST"],
+            total=2,  # Reduced retries for faster failure
+            backoff_factor=0.1,  # Quick exponential backoff
+            status_forcelist=[500, 502, 503, 504],  # Retry on server errors
+            allowed_methods=["GET", "POST"]  # Retry safe methods
         )
+        
         adapter = HTTPAdapter(
-            pool_connections=20,
-            pool_maxsize=50,
+            pool_connections=10,  # Number of connection pools
+            pool_maxsize=20,  # Max connections per pool
             max_retries=retry_strategy,
-            pool_block=True
+            pool_block=False  # Don't block when pool is full
         )
+        
         session.mount("http://", adapter)
         session.mount("https://", adapter)
+        
         return session
-
+        
     @property
-    def session(self) -> requests.Session:
-        """Return a thread-local session, creating if missing (single definition)."""
+    def session(self):
+        """Get or create a thread-local requests session."""
         if not hasattr(self._local, 'session'):
             self._local.session = self._create_session()
+        return self._local.session
+    @property
+    def session(self):
+        """Get or create a thread-local requests session."""
+        if not hasattr(self._local, 'session'):
+            self._local.session = requests.Session()
+            # Set default headers for this thread's session
+            self._local.session.headers.update({
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            })
         return self._local.session
     
     def _sync_session_cookies(self):
@@ -369,37 +394,6 @@ class APIClient:
         except Exception as e:
             logger.error(f"Failed to submit answer: {str(e)}")
             raise
-
-    def submit_answer_enhanced(self, question_id: int, answer_id: int,
-                               include_next_question: bool = True,
-                               include_answer_options: bool = True) -> Dict[str, Any]:
-        """Submit an answer and optionally retrieve next question and its answer options.
-
-        Args:
-            question_id: Current question ID
-            answer_id: Selected answer ID (0-3)
-            include_next_question: Whether to include the next question in response
-            include_answer_options: Whether to include answer options for next question
-
-        Returns:
-            Combined response dict from enhanced endpoint.
-        """
-        try:
-            payload = {
-                "question_id": question_id,
-                "answer_id": answer_id,
-                "include_next_question": include_next_question,
-                "include_answer_options": include_answer_options
-            }
-            response = self.session.post(
-                f"{self.base_url}/answers/submit",
-                json=payload,
-                timeout=self.default_timeout
-            )
-            return self._handle_response(response)
-        except Exception as e:
-            logger.error(f"Enhanced submit failed: {str(e)}")
-            raise
     
     # === Theorems ===
     
@@ -623,44 +617,6 @@ class APIClient:
         
         # Cache for 1 hour (triangle types never change)
         return self._get_cached_or_fetch("triangle_types", fetch, ttl_seconds=3600)
-
-    # === Batch / Bootstrap Endpoints ===
-    def bootstrap_initial(self, include_theorems: bool = True,
-                          include_feedback_options: bool = True,
-                          include_triangles: bool = True) -> Dict[str, Any]:
-        """Fetch all initial page data in a single call.
-
-        Returns dict containing session, first_question, answer_options, theorems,
-        feedback_options, triangles (depending on flags).
-        """
-        try:
-            payload = {
-                "auto_start_session": True,
-                "include_theorems": include_theorems,
-                "include_feedback_options": include_feedback_options,
-                "include_triangles": include_triangles
-            }
-            response = self.session.post(
-                f"{self.base_url}/bootstrap",
-                json=payload,
-                timeout=self.default_timeout
-            )
-            return self._handle_response(response)
-        except Exception as e:
-            logger.error(f"Bootstrap failed: {str(e)}")
-            return {"error": str(e)}
-
-    def get_admin_dashboard(self) -> Dict[str, Any]:
-        """Retrieve combined admin dashboard data (statistics, theorems, system health)."""
-        try:
-            response = self.session.get(
-                f"{self.base_url}/admin/dashboard",
-                timeout=self.default_timeout
-            )
-            return self._handle_response(response)
-        except Exception as e:
-            logger.error(f"Admin dashboard fetch failed: {str(e)}")
-            return {"error": str(e)}
     
     def health_check(self) -> Dict[str, Any]:
         """

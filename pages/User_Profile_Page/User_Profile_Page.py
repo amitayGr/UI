@@ -105,7 +105,7 @@ def _get_recent_activity(cursor, user):
 
 def _get_admin_statistics(cursor):
     """Get system-wide statistics for admin dashboard with API integration."""
-    # System overview (local DB)
+    # Get system overview statistics from local database
     cursor.execute("""
         SELECT 
             (SELECT COUNT(*) FROM Users) as total_users,
@@ -123,13 +123,22 @@ def _get_admin_statistics(cursor):
     """)
     system_stats = cursor.fetchone()
 
-    # Batch admin dashboard from API (statistics + theorems + system health)
-    dashboard = api_client.get_admin_dashboard()
-    api_stats = dashboard.get('statistics') if isinstance(dashboard, dict) else None
-    theorems_data = dashboard.get('theorems', []) if isinstance(dashboard, dict) else []
-    system_health = dashboard.get('system_health') if isinstance(dashboard, dict) else None
+    # Get geometry learning statistics from API
+    api_stats = None
+    theorems_data = []
+    try:
+        # Get session statistics from API
+        api_stats = api_client.get_session_statistics()
+        
+        # Get theorems data from API
+        theorems_response = api_client.get_all_theorems(active_only=True)
+        theorems_data = theorems_response.get('theorems', [])
+        
+    except Exception as e:
+        print(f"Failed to get API statistics: {str(e)}")
 
-    # Question analytics (local logs)
+    # Question analytics is still from local logs for now
+    # This could be enhanced to use API data in the future
     cursor.execute("""
         SELECT 
             ISNULL(JSON_VALUE(action_data, '$.question_id'), 'unknown') as question_id,
@@ -147,7 +156,6 @@ def _get_admin_statistics(cursor):
     return {
         'system_stats': system_stats,
         'api_stats': api_stats,
-        'system_health': system_health,
         'question_analytics': question_analytics,
         'theorems': theorems_data
     }
