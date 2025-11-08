@@ -72,34 +72,34 @@ def after_request(response):
 @question_page.before_request
 def check_active_session():
     """Middleware to ensure API session state is initialized.
-    Creates a new API session if one doesn't exist."""
+    Uses local Flask session tracking to minimize API calls."""
     start_time = time.time()
     logger.info("⏱️  START: check_active_session middleware")
     
+    # Check if we already have a session flag in Flask session
+    # This avoids unnecessary API calls on every request
+    if session.get('api_session_active'):
+        elapsed = (time.time() - start_time) * 1000
+        logger.info(f"   - Session cached locally (no API call needed)")
+        logger.info(f"✅ DONE: check_active_session - {elapsed:.2f}ms")
+        return
+    
+    # Only make API call if we don't have local session flag
     try:
-        # Check if we have an active API session
-        check_start = time.time()
-        api_status = api_client.get_session_status()
-        check_elapsed = (time.time() - check_start) * 1000
-        logger.info(f"   - get_session_status: {check_elapsed:.2f}ms")
+        start_session_time = time.time()
+        # Optimistic approach: just start session
+        # API should be idempotent (won't create duplicate if exists)
+        api_client.start_session()
+        start_elapsed = (time.time() - start_session_time) * 1000
+        logger.info(f"   - start_session: {start_elapsed:.2f}ms")
         
-        if not api_status.get('active', False):
-            # Start a new API session
-            start_session_time = time.time()
-            api_client.start_session()
-            start_elapsed = (time.time() - start_session_time) * 1000
-            logger.info(f"   - start_session: {start_elapsed:.2f}ms")
+        # Mark session as active in Flask session
+        session['api_session_active'] = True
+        session.modified = True
+        
     except Exception as e:
-        # If API is not available or session creation fails, start a new one
-        logger.warning(f"   - Session check failed: {str(e)}")
-        try:
-            start_session_time = time.time()
-            api_client.start_session()
-            start_elapsed = (time.time() - start_session_time) * 1000
-            logger.info(f"   - start_session (recovery): {start_elapsed:.2f}ms")
-        except Exception as start_error:
-            logger.error(f"   - Failed to start API session: {str(start_error)}")
-            # Continue with local fallback if needed
+        logger.error(f"   - Failed to start API session: {str(e)}")
+        # Don't block the request, let individual routes handle errors
     
     total_elapsed = (time.time() - start_time) * 1000
     logger.info(f"✅ DONE: check_active_session - {total_elapsed:.2f}ms")
@@ -300,6 +300,9 @@ def finish_session():
                 helpful_theorems=helpful_theorems,
                 save_to_db=True
             )
+            # Clear the session flag
+            session.pop('api_session_active', None)
+            session.modified = True
         except Exception as api_error:
             print(f"API session end failed: {str(api_error)}")
             # Continue with local cleanup
@@ -328,6 +331,8 @@ def cleanup_session():
         # End the API session if active
         try:
             api_client.end_session(save_to_db=False)  # Don't save on cleanup
+            # Clear the session flag
+            session.pop('api_session_active', None)
         except Exception as api_error:
             print(f"API cleanup failed: {str(api_error)}")
             # Continue with local cleanup
