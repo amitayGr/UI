@@ -126,16 +126,23 @@ def _get_admin_statistics(cursor):
     # Get geometry learning statistics from API
     api_stats = None
     theorems_data = []
+    system_health = None
     try:
-        # Get session statistics from API
-        api_stats = api_client.get_session_statistics()
-        
-        # Get theorems data from API
-        theorems_response = api_client.get_all_theorems(active_only=True)
-        theorems_data = theorems_response.get('theorems', [])
+        # Try to use optimized admin dashboard endpoint (one call)
+        dashboard = api_client.get_admin_dashboard()
+        api_stats = dashboard.get('statistics')
+        theorems_data = dashboard.get('theorems', [])
+        system_health = dashboard.get('system_health')
         
     except Exception as e:
-        print(f"Failed to get API statistics: {str(e)}")
+        print(f"Failed to get admin dashboard: {str(e)}")
+        # Fallback to individual calls if batched endpoint not available
+        try:
+            api_stats = api_client.get_session_statistics()
+            theorems_response = api_client.get_all_theorems(active_only=True)
+            theorems_data = theorems_response.get('theorems', [])
+        except Exception as fallback_error:
+            print(f"Fallback also failed: {str(fallback_error)}")
 
     # Question analytics is still from local logs for now
     # This could be enhanced to use API data in the future

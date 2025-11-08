@@ -150,27 +150,84 @@ class APIClient:
             self._local.session = self._create_session()
         return self._local.session
 
-    def bootstrap_initial(self, include_debug: bool = False) -> Dict[str, Any]:
+    def bootstrap_initial(self, include_theorems: bool = True, 
+                         include_feedback: bool = True, 
+                         include_triangles: bool = True,
+                         include_debug: bool = False) -> Dict[str, Any]:
         """Bootstrap initial data for question page with minimal round-trips.
 
-        Currently sequential; centralizes logic for future batching or concurrency.
-        Returns keys: question, answer_options, debug (optional), bootstrap_errors (if any).
+        If the server supports /api/bootstrap endpoint, uses that for optimal performance.
+        Otherwise falls back to sequential calls.
+        
+        Args:
+            include_theorems: Include all theorems in response
+            include_feedback: Include feedback options
+            include_triangles: Include triangle types
+            include_debug: Include session debug info (admin only)
+        
+        Returns keys: session, first_question, answer_options, theorems (optional),
+                     feedback_options (optional), triangles (optional), debug (optional),
+                     bootstrap_errors (if any).
         """
+        # Try the new batched endpoint first
+        if self._is_breaker_open():
+            raise Exception("API temporarily unavailable (circuit breaker)")
+        
+        try:
+            def _call():
+                response = self.session.post(
+                    f"{self.base_url}/bootstrap",
+                    json={
+                        "auto_start_session": True,
+                        "include_theorems": include_theorems,
+                        "include_feedback_options": include_feedback,
+                        "include_triangles": include_triangles
+                    },
+                    timeout=self._choose_timeout('question')
+                )
+                return self._handle_response(response)
+            
+            result = self._time_call('bootstrap', _call)
+            
+            # Add debug info if requested (separate call for now)
+            if include_debug:
+                try:
+                    status = self.get_session_status()
+                    result['debug'] = status.get('state', {})
+                except Exception:
+                    result['debug'] = None
+            
+            return result
+            
+        except Exception as e:
+            logger.warning(f"Bootstrap endpoint failed: {e}, falling back to sequential calls")
+            # Fallback to sequential implementation
+            return self._bootstrap_fallback(include_theorems, include_feedback, 
+                                          include_triangles, include_debug)
+    
+    def _bootstrap_fallback(self, include_theorems: bool, include_feedback: bool,
+                           include_triangles: bool, include_debug: bool) -> Dict[str, Any]:
+        """Fallback bootstrap using sequential calls when batched endpoint unavailable."""
         result: Dict[str, Any] = {}
         errors: List[str] = []
 
-        # Start or confirm session
+        # Start session
         try:
-            self.start_session()
+            session_result = self.start_session()
+            result['session'] = {
+                'session_id': session_result.get('session_id'),
+                'started': True
+            }
         except Exception as e:
             errors.append(f"start_session: {e}")
+            result['session'] = {'started': False}
 
         # First question
         try:
-            result['question'] = self.get_first_question()
+            result['first_question'] = self.get_first_question()
         except Exception as e:
             errors.append(f"get_first_question: {e}")
-            result['question'] = {}
+            result['first_question'] = {}
 
         # Answer options (cached)
         try:
@@ -179,6 +236,32 @@ class APIClient:
             errors.append(f"get_answer_options: {e}")
             result['answer_options'] = {'answers': []}
 
+        # Optional: Theorems
+        if include_theorems:
+            try:
+                theorems_data = self.get_all_theorems()
+                result['theorems'] = theorems_data.get('theorems', [])
+            except Exception as e:
+                errors.append(f"get_all_theorems: {e}")
+                result['theorems'] = []
+
+        # Optional: Feedback options
+        if include_feedback:
+            try:
+                result['feedback_options'] = self.get_feedback_options()
+            except Exception as e:
+                errors.append(f"get_feedback_options: {e}")
+                result['feedback_options'] = []
+
+        # Optional: Triangle types
+        if include_triangles:
+            try:
+                result['triangles'] = self.get_triangle_types()
+            except Exception as e:
+                errors.append(f"get_triangle_types: {e}")
+                result['triangles'] = []
+
+        # Optional: Debug info
         if include_debug:
             try:
                 status = self.get_session_status()
@@ -488,23 +571,30 @@ class APIClient:
         # Cache for 1 hour (answer options rarely change)
         return self._get_cached_or_fetch("answer_options", fetch, ttl_seconds=3600)
     
-    def submit_answer(self, question_id: int, answer_id: int) -> Dict[str, Any]:
+    def submit_answer(self, question_id: int, answer_id: int, 
+                     include_next_question: bool = True,
+                     include_answer_options: bool = True) -> Dict[str, Any]:
         """
         Submit an answer to the current question.
         
         Args:
             question_id: ID of the question being answered
             answer_id: ID of the selected answer (0-3)
+            include_next_question: Include next question in response for faster flow
+            include_answer_options: Include answer options for next question
             
         Returns:
-            Dictionary containing processing results and relevant theorems
+            Dictionary containing processing results, relevant theorems,
+            and optionally next_question and answer_options
         """
         if self._is_breaker_open():
             raise Exception("API temporarily unavailable (circuit breaker)")
         def _call():
             data = {
                 "question_id": question_id,
-                "answer_id": answer_id
+                "answer_id": answer_id,
+                "include_next_question": include_next_question,
+                "include_answer_options": include_answer_options
             }
             response = self.session.post(
                 f"{self.base_url}/answers/submit",
@@ -793,6 +883,51 @@ class APIClient:
             'failures': self._failure_count,
             'open_until': self._breaker_open_until.isoformat() if self._breaker_open_until else None
         }
+    
+    def get_admin_dashboard(self) -> Dict[str, Any]:
+        """
+        Get comprehensive admin dashboard data in one call.
+        Combines session statistics, theorems, and system health.
+        
+        Returns:
+            Dictionary containing statistics, theorems, and system_health.
+            Falls back to individual calls if batched endpoint unavailable.
+        """
+        if self._is_breaker_open():
+            raise Exception("API temporarily unavailable (circuit breaker)")
+        
+        try:
+            def _call():
+                response = self.session.get(
+                    f"{self.base_url}/admin/dashboard",
+                    timeout=self._choose_timeout('history')
+                )
+                return self._handle_response(response)
+            
+            return self._time_call('admin_dashboard', _call)
+            
+        except Exception as e:
+            logger.warning(f"Admin dashboard endpoint failed: {e}, falling back to individual calls")
+            # Fallback to individual calls
+            dashboard = {}
+            
+            try:
+                dashboard['statistics'] = self.get_session_statistics()
+            except Exception:
+                dashboard['statistics'] = {}
+            
+            try:
+                theorems_data = self.get_all_theorems()
+                dashboard['theorems'] = theorems_data.get('theorems', [])
+            except Exception:
+                dashboard['theorems'] = []
+            
+            try:
+                dashboard['system_health'] = self.health_check()
+            except Exception:
+                dashboard['system_health'] = {'status': 'unknown'}
+            
+            return dashboard
 
 
 # Global API client instance

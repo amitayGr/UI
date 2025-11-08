@@ -71,15 +71,27 @@ def question():
         return redirect(url_for('login_page.login'))
 
     try:
-        bootstrap = api_client.bootstrap_initial(include_debug=(user_role == 'admin'))
+        # Use optimized bootstrap to get all initial data in one call
+        bootstrap = api_client.bootstrap_initial(
+            include_theorems=False,  # Not needed on initial load
+            include_feedback=False,  # Not needed on initial load
+            include_triangles=False, # Not needed on initial load
+            include_debug=(user_role == 'admin')
+        )
         UserLogger.log_session_start("NEW_SESSION")
 
-        question_data = bootstrap.get('question', {})
+        # Extract data from bootstrap response
+        session_data = bootstrap.get('session', {})
+        question_data = bootstrap.get('first_question', {})
         question_id = question_data.get('question_id')
         question_text = question_data.get('question_text')
         debug_info = bootstrap.get('debug') if user_role == 'admin' else None
         answer_options = bootstrap.get('answer_options', {})
         answers = answer_options.get('answers', [])
+
+        # Log any bootstrap errors for debugging
+        if bootstrap.get('bootstrap_errors'):
+            logger.warning(f"Bootstrap errors: {bootstrap['bootstrap_errors']}")
 
         return render_template(
             'Question_Page.html',
@@ -117,20 +129,34 @@ def process_answer():
             }
             answer_id = answer_mapping.get(answer, 2)  # Default to "לא יודע"
 
-        # Submit answer to API
-        answer_result = api_client.submit_answer(question_id, answer_id)
+        # Submit answer to API with enhanced response including next question
+        answer_result = api_client.submit_answer(
+            question_id, 
+            answer_id,
+            include_next_question=True,
+            include_answer_options=True
+        )
         
         UserLogger.log_question_answer(question_id, f"Answer ID: {answer_id}", answer)
 
-        # Get next question from API
-        try:
-            next_question_data = api_client.get_next_question()
-            next_question_id = next_question_data.get('question_id')
-            next_question_text = next_question_data.get('question_text')
-        except Exception:
-            # If no more questions available, end session
-            next_question_id = None
-            next_question_text = None
+        # Check if next question is included in response (optimized path)
+        next_question_id = None
+        next_question_text = None
+        
+        if 'next_question' in answer_result and answer_result['next_question']:
+            # Next question already in response - no additional API call needed!
+            next_question_id = answer_result['next_question'].get('question_id')
+            next_question_text = answer_result['next_question'].get('question_text')
+        else:
+            # Fallback: try separate call if server doesn't support enhanced response
+            try:
+                next_question_data = api_client.get_next_question()
+                next_question_id = next_question_data.get('question_id')
+                next_question_text = next_question_data.get('question_text')
+            except Exception:
+                # If no more questions available, end session
+                next_question_id = None
+                next_question_text = None
 
         # Get relevant theorems from answer submission result
         relevant_theorems = answer_result.get('relevant_theorems', [])
