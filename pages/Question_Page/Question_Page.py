@@ -42,22 +42,22 @@ def after_request(response):
 
 
 @question_page.before_request
-def ensure_api_session():
-    """Ensure API session is started; avoid repeated status checks using a flag."""
-    if not session.get('api_session_active'):
+def check_active_session():
+    """Middleware to ensure API session state is initialized.
+    Creates a new API session if one doesn't exist."""
+    try:
+        # Check if we have an active API session
+        api_status = api_client.get_session_status()
+        if not api_status.get('active', False):
+            # Start a new API session
+            api_client.start_session()
+    except Exception as e:
+        # If API is not available or session creation fails, start a new one
         try:
-            api_status = api_client.get_session_status()
-            if api_status.get('active', False):
-                session['api_session_active'] = True
-            else:
-                api_client.start_session()
-                session['api_session_active'] = True
-        except Exception:
-            try:
-                api_client.start_session()
-                session['api_session_active'] = True
-            except Exception as start_error:
-                print(f"Failed to start API session: {str(start_error)}")
+            api_client.start_session()
+        except Exception as start_error:
+            print(f"Failed to start API session: {str(start_error)}")
+            # Continue with local fallback if needed
 
 
 @question_page.route('/')
@@ -71,27 +71,28 @@ def question():
         return redirect(url_for('login_page.login'))
 
     try:
-        # Use optimized bootstrap to get all initial data in one call
-        bootstrap = api_client.bootstrap_initial(
-            include_theorems=False,  # Not needed on initial load
-            include_feedback=False,  # Not needed on initial load
-            include_triangles=False, # Not needed on initial load
-            include_debug=(user_role == 'admin')
-        )
+        # Start a new API session and get the first question
+        api_client.start_session()
         UserLogger.log_session_start("NEW_SESSION")
 
-        # Extract data from bootstrap response
-        session_data = bootstrap.get('session', {})
-        question_data = bootstrap.get('first_question', {})
+        # Get first question from API
+        question_data = api_client.get_first_question()
         question_id = question_data.get('question_id')
         question_text = question_data.get('question_text')
-        debug_info = bootstrap.get('debug') if user_role == 'admin' else None
-        answer_options = bootstrap.get('answer_options', {})
-        answers = answer_options.get('answers', [])
 
-        # Log any bootstrap errors for debugging
-        if bootstrap.get('bootstrap_errors'):
-            logger.warning(f"Bootstrap errors: {bootstrap['bootstrap_errors']}")
+        # For admin users, get debug information (if available via API)
+        debug_info = None
+        if user_role == 'admin':
+            try:
+                # Try to get session status for debug info
+                status = api_client.get_session_status()
+                debug_info = status.get('state', {})
+            except Exception:
+                debug_info = None
+
+        # Get answer options from API
+        answer_options = api_client.get_answer_options()
+        answers = answer_options.get('answers', [])
 
         return render_template(
             'Question_Page.html',
@@ -100,8 +101,7 @@ def question():
             question_text=question_text,
             debug_info=debug_info,
             answer_options=answers,
-            initial_theorems=[],
-            bootstrap_errors=bootstrap.get('bootstrap_errors')
+            initial_theorems=[]  # Will be populated after first answer
         )
     except Exception as e:
         print(f"Error in question route: {str(e)}")
@@ -129,34 +129,20 @@ def process_answer():
             }
             answer_id = answer_mapping.get(answer, 2)  # Default to "לא יודע"
 
-        # Submit answer to API with enhanced response including next question
-        answer_result = api_client.submit_answer(
-            question_id, 
-            answer_id,
-            include_next_question=True,
-            include_answer_options=True
-        )
+        # Submit answer to API
+        answer_result = api_client.submit_answer(question_id, answer_id)
         
         UserLogger.log_question_answer(question_id, f"Answer ID: {answer_id}", answer)
 
-        # Check if next question is included in response (optimized path)
-        next_question_id = None
-        next_question_text = None
-        
-        if 'next_question' in answer_result and answer_result['next_question']:
-            # Next question already in response - no additional API call needed!
-            next_question_id = answer_result['next_question'].get('question_id')
-            next_question_text = answer_result['next_question'].get('question_text')
-        else:
-            # Fallback: try separate call if server doesn't support enhanced response
-            try:
-                next_question_data = api_client.get_next_question()
-                next_question_id = next_question_data.get('question_id')
-                next_question_text = next_question_data.get('question_text')
-            except Exception:
-                # If no more questions available, end session
-                next_question_id = None
-                next_question_text = None
+        # Get next question from API
+        try:
+            next_question_data = api_client.get_next_question()
+            next_question_id = next_question_data.get('question_id')
+            next_question_text = next_question_data.get('question_text')
+        except Exception:
+            # If no more questions available, end session
+            next_question_id = None
+            next_question_text = None
 
         # Get relevant theorems from answer submission result
         relevant_theorems = answer_result.get('relevant_theorems', [])
