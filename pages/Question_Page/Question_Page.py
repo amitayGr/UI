@@ -44,31 +44,20 @@ def after_request(response):
 @question_page.before_request
 def check_active_session():
     """Middleware to ensure API session state is initialized.
-    Creates a new API session if one doesn't exist.
-    
-    OPTIMIZATION: Only checks session status when flag is not set,
-    reducing redundant calls while ensuring session validity.
-    """
+    Creates a new API session if one doesn't exist."""
     try:
-        # If we don't have a local flag, check with API
-        if not session.get('api_session_active', False):
-            # Verify with API if session is actually active
-            try:
-                api_status = api_client.get_session_status()
-                if api_status.get('active', False):
-                    # Session exists, set flag
-                    session['api_session_active'] = True
-                else:
-                    # No active session, start one
-                    api_client.start_session()
-                    session['api_session_active'] = True
-            except Exception:
-                # API call failed or no session, start a new one
-                api_client.start_session()
-                session['api_session_active'] = True
+        # Check if we have an active API session
+        api_status = api_client.get_session_status()
+        if not api_status.get('active', False):
+            # Start a new API session
+            api_client.start_session()
     except Exception as e:
-        print(f"Failed to ensure API session: {str(e)}")
-        session['api_session_active'] = False
+        # If API is not available or session creation fails, start a new one
+        try:
+            api_client.start_session()
+        except Exception as start_error:
+            print(f"Failed to start API session: {str(start_error)}")
+            # Continue with local fallback if needed
 
 
 @question_page.route('/')
@@ -82,7 +71,8 @@ def question():
         return redirect(url_for('login_page.login'))
 
     try:
-        # Middleware already ensures we have a session
+        # Start a new API session and get the first question
+        api_client.start_session()
         UserLogger.log_session_start("NEW_SESSION")
 
         # Get first question from API
@@ -90,8 +80,15 @@ def question():
         question_id = question_data.get('question_id')
         question_text = question_data.get('question_text')
 
-        # For admin users, skip debug info to avoid extra API call
+        # For admin users, get debug information (if available via API)
         debug_info = None
+        if user_role == 'admin':
+            try:
+                # Try to get session status for debug info
+                status = api_client.get_session_status()
+                debug_info = status.get('state', {})
+            except Exception:
+                debug_info = None
 
         # Get answer options from API
         answer_options = api_client.get_answer_options()
@@ -108,9 +105,6 @@ def question():
         )
     except Exception as e:
         print(f"Error in question route: {str(e)}")
-        # If we get a session error, clear the flag so middleware will recreate
-        if "session" in str(e).lower():
-            session['api_session_active'] = False
         return redirect(url_for('login_page.login'))
 
 
@@ -175,17 +169,18 @@ def process_answer():
             'triangle_weights': updated_weights
         }
 
-        # OPTIMIZATION: Removed debug info API call for admin users
-        # This saves 50-100ms on every answer submission
-        # The session state is maintained by the API via cookies
+        # Add debug info for admin users
+        if session.get('user', {}).get('role') == 'admin':
+            try:
+                status = api_client.get_session_status()
+                response_data['debug'] = status.get('state', {})
+            except Exception:
+                pass
 
         return jsonify(response_data)
 
     except Exception as e:
         print(f"Error in answer route: {str(e)}")
-        # If we get a session error, clear the flag so middleware will recreate
-        if "session" in str(e).lower():
-            session['api_session_active'] = False
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -211,8 +206,6 @@ def finish_session():
                 helpful_theorems=helpful_theorems,
                 save_to_db=True
             )
-            # Clear the session active flag
-            session['api_session_active'] = False
         except Exception as api_error:
             print(f"API session end failed: {str(api_error)}")
             # Continue with local cleanup
@@ -241,8 +234,6 @@ def cleanup_session():
         # End the API session if active
         try:
             api_client.end_session(save_to_db=False)  # Don't save on cleanup
-            # Clear the session active flag
-            session['api_session_active'] = False
         except Exception as api_error:
             print(f"API cleanup failed: {str(api_error)}")
             # Continue with local cleanup
@@ -266,15 +257,13 @@ def cleanup_session():
 
 @question_page.route('/check-timeout', methods=['GET'])
 def check_timeout():
-    """Check if current session has timed out.
-    
-    Uses the local flag first, but if flag indicates active session,
-    we trust it since middleware validates on each request.
-    """
+    """Check if current session has timed out using API."""
     try:
-        # Check local Flask session flag
-        # Middleware ensures this is kept in sync with API
-        is_active = session.get('api_session_active', False)
+        # Check API session status
+        status = api_client.get_session_status()
+        is_active = status.get('active', False)
+        
+        # If API session is not active, consider it timed out
         return jsonify({'timeout': not is_active})
     except Exception as e:
         print(f"Error in check_timeout route: {str(e)}")
