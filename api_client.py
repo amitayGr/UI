@@ -95,6 +95,10 @@ class APIClient:
         # This ensures each thread gets its own session object
         self._local = threading.local()
         
+        # Session ID storage (thread-safe)
+        self._session_id_lock = threading.Lock()
+        self._session_ids = {}  # Maps thread_id to session_id
+        
         # Performance settings
         self.default_timeout = 3  # Reduced from default 30s for faster failure detection
         self.cache_enabled = True  # Enable caching for static data
@@ -136,22 +140,53 @@ class APIClient:
         if not hasattr(self._local, 'session'):
             self._local.session = self._create_session()
         return self._local.session
-    @property
-    def session(self):
-        """Get or create a thread-local requests session."""
-        if not hasattr(self._local, 'session'):
-            self._local.session = requests.Session()
-            # Set default headers for this thread's session
-            self._local.session.headers.update({
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            })
-        return self._local.session
+    
+    def _get_session_id(self) -> Optional[str]:
+        """Get the session ID for the current thread from Flask session."""
+        try:
+            from flask import session as flask_session
+            return flask_session.get('api_session_id')
+        except:
+            return None
+    
+    def _set_session_id(self, session_id: str):
+        """Store the session ID in Flask session."""
+        try:
+            from flask import session as flask_session
+            flask_session['api_session_id'] = session_id
+            flask_session.modified = True
+            logger.info(f"   💾 Stored session_id: {session_id}")
+        except Exception as e:
+            logger.warning(f"Could not store session_id in Flask session: {e}")
+    
+    def _clear_session_id(self):
+        """Clear the session ID from Flask session."""
+        try:
+            from flask import session as flask_session
+            flask_session.pop('api_session_id', None)
+            flask_session.modified = True
+            logger.info(f"   🗑️  Cleared session_id")
+        except:
+            pass
     
     def _sync_session_cookies(self):
-        """Synchronize Flask session cookies with requests session."""
-        # Note: The API uses its own session management, so we'll let it handle cookies
-        pass
+        """Synchronize session ID with request headers."""
+        session_id = self._get_session_id()
+        if session_id:
+            # Add session_id to headers or cookies as needed
+            # Check if API uses cookies or headers for session
+            self.session.cookies.set('session_id', session_id)
+            logger.debug(f"Synced session_id to cookies: {session_id}")
+    
+    def _make_request_with_session(self, method: str, endpoint: str, **kwargs):
+        """Make an API request with automatic session ID syncing."""
+        # Sync session cookies before every request
+        self._sync_session_cookies()
+        
+        # Make the request
+        url = f"{self.base_url}{endpoint}"
+        response = getattr(self.session, method.lower())(url, **kwargs)
+        return response
     
     def close_session(self):
         """Close the thread-local session if it exists."""
@@ -235,6 +270,15 @@ class APIClient:
                 timeout=self.default_timeout
             )
             result = self._handle_response(response)
+            
+            # Store session_id if returned
+            if 'session_id' in result:
+                self._set_session_id(result['session_id'])
+            
+            # Also check cookies for session_id
+            if 'session_id' in self.session.cookies:
+                self._set_session_id(self.session.cookies['session_id'])
+            
             elapsed = (time.time() - start_time) * 1000
             logger.info(f"   ✅ API: start_session - {elapsed:.2f}ms")
             return result
@@ -253,6 +297,9 @@ class APIClient:
         start_time = time.time()
         logger.info("   🔹 API: get_session_status")
         try:
+            # Sync session ID before request
+            self._sync_session_cookies()
+            
             response = self.session.get(
                 f"{self.base_url}/session/status",
                 timeout=self.default_timeout
@@ -283,6 +330,9 @@ class APIClient:
             Dictionary containing session end confirmation
         """
         try:
+            # Sync session ID before request
+            self._sync_session_cookies()
+            
             data = {"save_to_db": save_to_db}
             if feedback is not None:
                 data["feedback"] = feedback
@@ -292,7 +342,12 @@ class APIClient:
                 data["helpful_theorems"] = helpful_theorems
                 
             response = self.session.post(f"{self.base_url}/session/end", json=data)
-            return self._handle_response(response)
+            result = self._handle_response(response)
+            
+            # Clear session ID after ending
+            self._clear_session_id()
+            
+            return result
         except Exception as e:
             logger.error(f"Failed to end session: {str(e)}")
             raise
@@ -323,6 +378,9 @@ class APIClient:
         start_time = time.time()
         logger.info("   🔹 API: get_first_question")
         try:
+            # Sync session ID before request
+            self._sync_session_cookies()
+            
             response = self.session.get(
                 f"{self.base_url}/questions/first",
                 timeout=self.default_timeout
@@ -346,6 +404,9 @@ class APIClient:
         start_time = time.time()
         logger.info("   🔹 API: get_next_question")
         try:
+            # Sync session ID before request
+            self._sync_session_cookies()
+            
             response = self.session.get(
                 f"{self.base_url}/questions/next",
                 timeout=self.default_timeout
@@ -418,6 +479,9 @@ class APIClient:
         start_time = time.time()
         logger.info(f"   🔹 API: submit_answer (Q{question_id}, A{answer_id})")
         try:
+            # Sync session ID before request
+            self._sync_session_cookies()
+            
             data = {
                 "question_id": question_id,
                 "answer_id": answer_id

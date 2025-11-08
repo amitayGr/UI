@@ -300,8 +300,9 @@ def finish_session():
                 helpful_theorems=helpful_theorems,
                 save_to_db=True
             )
-            # Clear the session flag
+            # Clear both session flags
             session.pop('api_session_active', None)
+            session.pop('api_session_id', None)
             session.modified = True
         except Exception as api_error:
             print(f"API session end failed: {str(api_error)}")
@@ -331,8 +332,9 @@ def cleanup_session():
         # End the API session if active
         try:
             api_client.end_session(save_to_db=False)  # Don't save on cleanup
-            # Clear the session flag
+            # Clear both session flags
             session.pop('api_session_active', None)
+            session.pop('api_session_id', None)
         except Exception as api_error:
             print(f"API cleanup failed: {str(api_error)}")
             # Continue with local cleanup
