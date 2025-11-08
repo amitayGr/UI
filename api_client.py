@@ -25,14 +25,9 @@ from functools import lru_cache
 from datetime import datetime, timedelta
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-import time
 
-# Configure logging with precise timestamps
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s.%(msecs)03d [%(name)s] %(message)s',
-    datefmt='%H:%M:%S'
-)
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Performance optimization: Simple cache for static data
@@ -98,33 +93,6 @@ class APIClient:
         # Performance settings
         self.default_timeout = 3  # Reduced from default 30s for faster failure detection
         self.cache_enabled = True  # Enable caching for static data
-    
-    def _get_api_session_cookie(self) -> Optional[str]:
-        """Get the API session cookie from Flask session."""
-        try:
-            from flask import session as flask_session
-            return flask_session.get('_api_session_cookie')
-        except:
-            return None
-    
-    def _save_api_session_cookie(self, cookie_value: str):
-        """Save the API session cookie to Flask session."""
-        try:
-            from flask import session as flask_session
-            flask_session['_api_session_cookie'] = cookie_value
-            flask_session.modified = True
-            logger.info(f"   💾 Saved session cookie to Flask session")
-        except Exception as e:
-            logger.warning(f"Could not save cookie to Flask session: {e}")
-    
-    def _restore_api_session_cookie(self):
-        """Restore the API session cookie from Flask session to requests session."""
-        saved_cookie = self._get_api_session_cookie()
-        if saved_cookie and 'session' not in self.session.cookies:
-            self.session.cookies.set('session', saved_cookie)
-            logger.info(f"   🔄 Restored session cookie from Flask session")
-            return True
-        return False
         
     def _create_session(self) -> requests.Session:
         """Create a new requests session with optimizations."""
@@ -159,33 +127,26 @@ class APIClient:
         
     @property
     def session(self):
-        """Get or create a thread-local requests session.
-        Each thread gets its own session with persistent cookies."""
+        """Get or create a thread-local requests session."""
         if not hasattr(self._local, 'session'):
             self._local.session = self._create_session()
-            # Restore session cookie from Flask session if it exists
-            self._restore_api_session_cookie()
+        return self._local.session
+    @property
+    def session(self):
+        """Get or create a thread-local requests session."""
+        if not hasattr(self._local, 'session'):
+            self._local.session = requests.Session()
+            # Set default headers for this thread's session
+            self._local.session.headers.update({
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            })
         return self._local.session
     
-    def _store_session_in_flask(self, api_session_id: str):
-        """Store API session ID in Flask session for reference."""
-        try:
-            from flask import session as flask_session
-            flask_session['api_session_id'] = api_session_id
-            flask_session.modified = True
-            logger.info(f"   💾 Stored API session_id: {api_session_id}")
-        except Exception as e:
-            logger.warning(f"Could not store session_id in Flask session: {e}")
-    
-    def _clear_flask_session_id(self):
-        """Clear the API session ID from Flask session."""
-        try:
-            from flask import session as flask_session
-            flask_session.pop('api_session_id', None)
-            flask_session.modified = True
-            logger.info(f"   🗑️  Cleared API session_id from Flask session")
-        except:
-            pass
+    def _sync_session_cookies(self):
+        """Synchronize Flask session cookies with requests session."""
+        # Note: The API uses its own session management, so we'll let it handle cookies
+        pass
     
     def close_session(self):
         """Close the thread-local session if it exists."""
@@ -257,47 +218,18 @@ class APIClient:
     def start_session(self) -> Dict[str, Any]:
         """
         Start a new learning session on the API server.
-        The API uses Flask session cookies which are automatically handled by requests.Session().
         
         Returns:
             Dictionary containing session_id and success message
         """
-        start_time = time.time()
-        logger.info("   🔹 API: start_session")
         try:
-            # Log cookies before request
-            logger.info(f"   📦 Cookies before start_session: {dict(self.session.cookies)}")
-            
             response = self.session.post(
                 f"{self.base_url}/session/start",
                 timeout=self.default_timeout
             )
-            
-            # Log response headers to see Set-Cookie
-            logger.info(f"   📥 Response Set-Cookie headers: {response.headers.get('Set-Cookie', 'None')}")
-            logger.info(f"   📦 Cookies after start_session: {dict(self.session.cookies)}")
-            
-            result = self._handle_response(response)
-            
-            # CRITICAL: Save the session cookie to Flask session
-            # so it persists across different thread-local sessions
-            if 'session' in self.session.cookies:
-                self._save_api_session_cookie(self.session.cookies['session'])
-            
-            # Store session_id in Flask session for reference (if returned)
-            if 'session_id' in result:
-                self._store_session_in_flask(result['session_id'])
-            
-            # The important part: requests.Session() automatically stores
-            # the Flask session cookie from Set-Cookie header
-            logger.info(f"   🍪 Session cookie stored by requests.Session()")
-            
-            elapsed = (time.time() - start_time) * 1000
-            logger.info(f"   ✅ API: start_session - {elapsed:.2f}ms")
-            return result
+            return self._handle_response(response)
         except Exception as e:
-            elapsed = (time.time() - start_time) * 1000
-            logger.error(f"   ❌ API: start_session - {elapsed:.2f}ms - {str(e)}")
+            logger.error(f"Failed to start session: {str(e)}")
             raise
     
     def get_session_status(self) -> Dict[str, Any]:
@@ -307,20 +239,14 @@ class APIClient:
         Returns:
             Dictionary containing session status and state information
         """
-        start_time = time.time()
-        logger.info("   🔹 API: get_session_status")
         try:
             response = self.session.get(
                 f"{self.base_url}/session/status",
                 timeout=self.default_timeout
             )
-            result = self._handle_response(response)
-            elapsed = (time.time() - start_time) * 1000
-            logger.info(f"   ✅ API: get_session_status - {elapsed:.2f}ms")
-            return result
+            return self._handle_response(response)
         except Exception as e:
-            elapsed = (time.time() - start_time) * 1000
-            logger.error(f"   ❌ API: get_session_status - {elapsed:.2f}ms - {str(e)}")
+            logger.error(f"Failed to get session status: {str(e)}")
             raise
     
     def end_session(self, feedback: Optional[int] = None, 
@@ -349,12 +275,7 @@ class APIClient:
                 data["helpful_theorems"] = helpful_theorems
                 
             response = self.session.post(f"{self.base_url}/session/end", json=data)
-            result = self._handle_response(response)
-            
-            # Clear Flask session reference
-            self._clear_flask_session_id()
-            
-            return result
+            return self._handle_response(response)
         except Exception as e:
             logger.error(f"Failed to end session: {str(e)}")
             raise
@@ -382,23 +303,14 @@ class APIClient:
         Returns:
             Dictionary containing question_id and question_text
         """
-        start_time = time.time()
-        logger.info("   🔹 API: get_first_question")
         try:
-            # Log cookies being sent
-            logger.info(f"   📦 Cookies being sent: {dict(self.session.cookies)}")
-            
             response = self.session.get(
                 f"{self.base_url}/questions/first",
                 timeout=self.default_timeout
             )
-            result = self._handle_response(response)
-            elapsed = (time.time() - start_time) * 1000
-            logger.info(f"   ✅ API: get_first_question - {elapsed:.2f}ms")
-            return result
+            return self._handle_response(response)
         except Exception as e:
-            elapsed = (time.time() - start_time) * 1000
-            logger.error(f"   ❌ API: get_first_question - {elapsed:.2f}ms - {str(e)}")
+            logger.error(f"Failed to get first question: {str(e)}")
             raise
     
     def get_next_question(self) -> Dict[str, Any]:
@@ -408,20 +320,14 @@ class APIClient:
         Returns:
             Dictionary containing question_id, question_text, and info
         """
-        start_time = time.time()
-        logger.info("   🔹 API: get_next_question")
         try:
             response = self.session.get(
                 f"{self.base_url}/questions/next",
                 timeout=self.default_timeout
             )
-            result = self._handle_response(response)
-            elapsed = (time.time() - start_time) * 1000
-            logger.info(f"   ✅ API: get_next_question - {elapsed:.2f}ms")
-            return result
+            return self._handle_response(response)
         except Exception as e:
-            elapsed = (time.time() - start_time) * 1000
-            logger.error(f"   ❌ API: get_next_question - {elapsed:.2f}ms - {str(e)}")
+            logger.error(f"Failed to get next question: {str(e)}")
             raise
     
     def get_question_details(self, question_id: int) -> Dict[str, Any]:
@@ -449,9 +355,6 @@ class APIClient:
         Returns:
             Dictionary containing list of answer options
         """
-        start_time = time.time()
-        logger.info("   🔹 API: get_answer_options")
-        
         def fetch():
             try:
                 response = self.session.get(
@@ -464,10 +367,7 @@ class APIClient:
                 raise
         
         # Cache for 1 hour (answer options rarely change)
-        result = self._get_cached_or_fetch("answer_options", fetch, ttl_seconds=3600)
-        elapsed = (time.time() - start_time) * 1000
-        logger.info(f"   ✅ API: get_answer_options - {elapsed:.2f}ms (cached: {elapsed < 5})")
-        return result
+        return self._get_cached_or_fetch("answer_options", fetch, ttl_seconds=3600)
     
     def submit_answer(self, question_id: int, answer_id: int) -> Dict[str, Any]:
         """
@@ -480,8 +380,6 @@ class APIClient:
         Returns:
             Dictionary containing processing results and relevant theorems
         """
-        start_time = time.time()
-        logger.info(f"   🔹 API: submit_answer (Q{question_id}, A{answer_id})")
         try:
             data = {
                 "question_id": question_id,
@@ -492,14 +390,9 @@ class APIClient:
                 json=data,
                 timeout=self.default_timeout
             )
-            result = self._handle_response(response)
-            elapsed = (time.time() - start_time) * 1000
-            theorem_count = len(result.get('relevant_theorems', []))
-            logger.info(f"   ✅ API: submit_answer - {elapsed:.2f}ms ({theorem_count} theorems)")
-            return result
+            return self._handle_response(response)
         except Exception as e:
-            elapsed = (time.time() - start_time) * 1000
-            logger.error(f"   ❌ API: submit_answer - {elapsed:.2f}ms - {str(e)}")
+            logger.error(f"Failed to submit answer: {str(e)}")
             raise
     
     # === Theorems ===
