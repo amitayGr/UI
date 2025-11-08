@@ -71,28 +71,40 @@ def question():
         return redirect(url_for('login_page.login'))
 
     try:
-        # Start a new API session and get the first question
-        api_client.start_session()
-        UserLogger.log_session_start("NEW_SESSION")
+        # Use optimized bootstrap endpoint (auto starts session)
+        bootstrap = api_client.bootstrap_initial(
+            include_theorems=True,
+            include_feedback_options=True,
+            include_triangles=True
+        )
 
-        # Get first question from API
-        question_data = api_client.get_first_question()
+        if 'error' in bootstrap:
+            raise Exception(bootstrap['error'])
+
+        UserLogger.log_session_start(bootstrap.get('session', {}).get('session_id', 'NEW_SESSION'))
+
+        question_data = bootstrap.get('first_question', {})
         question_id = question_data.get('question_id')
         question_text = question_data.get('question_text')
+        answers = bootstrap.get('answer_options', {}).get('answers', [])
+        theorems = bootstrap.get('theorems', [])
 
-        # For admin users, get debug information (if available via API)
+        # Prepare initial theorem list (could be shown as reference/help panel)
+        formatted_theorems = [
+            {
+                'id': t.get('theorem_id'),
+                'text': t.get('theorem_text'),
+                'category': t.get('category', 0)
+            } for t in theorems
+        ]
+
         debug_info = None
         if user_role == 'admin':
             try:
-                # Try to get session status for debug info
                 status = api_client.get_session_status()
                 debug_info = status.get('state', {})
             except Exception:
-                debug_info = None
-
-        # Get answer options from API
-        answer_options = api_client.get_answer_options()
-        answers = answer_options.get('answers', [])
+                pass
 
         return render_template(
             'Question_Page.html',
@@ -101,10 +113,10 @@ def question():
             question_text=question_text,
             debug_info=debug_info,
             answer_options=answers,
-            initial_theorems=[]  # Will be populated after first answer
+            initial_theorems=formatted_theorems
         )
     except Exception as e:
-        print(f"Error in question route: {str(e)}")
+        print(f"Error in question route (bootstrap): {str(e)}")
         return redirect(url_for('login_page.login'))
 
 
@@ -129,42 +141,40 @@ def process_answer():
             }
             answer_id = answer_mapping.get(answer, 2)  # Default to "לא יודע"
 
-        # Submit answer to API
-        answer_result = api_client.submit_answer(question_id, answer_id)
-        
+        # Enhanced submit to fetch next question + answer options in same call
+        answer_result = api_client.submit_answer_enhanced(
+            question_id=question_id,
+            answer_id=answer_id,
+            include_next_question=True,
+            include_answer_options=True
+        )
+
         UserLogger.log_question_answer(question_id, f"Answer ID: {answer_id}", answer)
 
-        # Get next question from API
-        try:
-            next_question_data = api_client.get_next_question()
-            next_question_id = next_question_data.get('question_id')
-            next_question_text = next_question_data.get('question_text')
-        except Exception:
-            # If no more questions available, end session
-            next_question_id = None
-            next_question_text = None
+        next_question = answer_result.get('next_question')
+        answer_options = answer_result.get('answer_options', {})
+        next_answers = answer_options.get('answers') if answer_options else []
 
-        # Get relevant theorems from answer submission result
         relevant_theorems = answer_result.get('relevant_theorems', [])
-        
-        # Format theorems for response
-        formatted_theorems = [{
-            'id': theorem.get('theorem_id'),
-            'text': theorem.get('theorem_text'),
-            'weight': theorem.get('weight', 0),
-            'category': theorem.get('category', 0),
-            'combined_score': theorem.get('combined_score', 0)
-        } for theorem in relevant_theorems]
+        formatted_theorems = [
+            {
+                'id': th.get('theorem_id'),
+                'text': th.get('theorem_text'),
+                'weight': th.get('weight', 0),
+                'category': th.get('category', 0),
+                'combined_score': th.get('combined_score', 0)
+            } for th in relevant_theorems
+        ]
 
-        # Get updated weights from answer result
         updated_weights = answer_result.get('updated_weights', {})
 
         response_data = {
             'success': True,
             'nextQuestion': {
-                'id': next_question_id,
-                'text': next_question_text
-            } if next_question_id else None,
+                'id': next_question.get('question_id'),
+                'text': next_question.get('question_text'),
+                'answers': next_answers
+            } if next_question else None,
             'theorems': formatted_theorems,
             'triangle_weights': updated_weights
         }

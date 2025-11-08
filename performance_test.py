@@ -114,33 +114,45 @@ if uncached_time and cached_time:
     print(f"\n   Cache Improvement: {improvement:.1f}% faster")
     print(f"   Speed-up: {uncached_time/cached_time:.1f}x")
 
-# Test 4: Question Flow
 print("\n" + "=" * 70)
-print("Test 4: Question Flow (Full Workflow)")
+print("Test 4: Question Flow (Legacy vs Batched)")
 print("=" * 70)
 
-# Start a fresh session
+legacy_first_q_time = legacy_submit_time = legacy_next_q_time = None
+bootstrap_time = enhanced_submit_time = None
+
 try:
+    # Legacy flow
     api_client.start_session()
-    
-    print("\n📝 First Question")
-    first_q_time = run_benchmark("Get First Question", 
-                                 api_client.get_first_question, runs=3)
-    
-    print("\n📝 Submit Answer")
-    submit_time = run_benchmark("Submit Answer", 
-                               api_client.submit_answer, runs=3, 
-                               question_id=1, answer_id=1)
-    
-    print("\n📝 Next Question")
-    next_q_time = run_benchmark("Get Next Question", 
-                               api_client.get_next_question, runs=3)
-    
-    # Clean up
+    print("\n📝 Legacy First Question")
+    legacy_first_q_time = run_benchmark("Legacy Get First Question", api_client.get_first_question, runs=3)
+    print("\n📝 Legacy Submit Answer")
+    legacy_submit_time = run_benchmark("Legacy Submit Answer", api_client.submit_answer, runs=3, question_id=1, answer_id=1)
+    print("\n📝 Legacy Next Question")
+    legacy_next_q_time = run_benchmark("Legacy Get Next Question", api_client.get_next_question, runs=3)
     api_client.end_session(save_to_db=False)
-    
 except Exception as e:
-    print(f"   ⚠️  Workflow test failed: {e}")
+    print(f"   ⚠️ Legacy workflow failed: {e}")
+
+try:
+    # Batched flow using bootstrap + enhanced submit
+    print("\n🧪 Bootstrap Initial (Batched)")
+    bootstrap_time = run_benchmark("Bootstrap Initial", api_client.bootstrap_initial, runs=3)
+    payload = api_client.bootstrap_initial()
+    q_id_for_submit = payload.get('first_question', {}).get('question_id', 1)
+    print("\n🧪 Enhanced Submit (Batched)")
+    enhanced_submit_time = run_benchmark(
+        "Submit Answer (enhanced)",
+        api_client.submit_answer_enhanced,
+        runs=3,
+        question_id=q_id_for_submit,
+        answer_id=1,
+        include_next_question=True,
+        include_answer_options=True
+    )
+    api_client.end_session(save_to_db=False)
+except Exception as e:
+    print(f"   ⚠️ Batched workflow failed: {e}")
 
 # Test 5: Theorems (Larger Dataset)
 print("\n" + "=" * 70)
@@ -199,9 +211,11 @@ results = {
     "Health Check": health_time,
     "Session Start": session_start_time,
     "Session Status": status_time,
-    "First Question": first_q_time if 'first_q_time' in locals() else None,
-    "Submit Answer": submit_time if 'submit_time' in locals() else None,
-    "Next Question": next_q_time if 'next_q_time' in locals() else None,
+    "Legacy First Question": legacy_first_q_time,
+    "Legacy Submit Answer": legacy_submit_time,
+    "Legacy Next Question": legacy_next_q_time,
+    "Bootstrap Initial": bootstrap_time,
+    "Enhanced Submit": enhanced_submit_time,
     "Theorems (cached)": theorems_cached,
     "Rapid Fire (avg)": rapid_time,
 }
