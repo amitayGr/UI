@@ -98,6 +98,33 @@ class APIClient:
         # Performance settings
         self.default_timeout = 3  # Reduced from default 30s for faster failure detection
         self.cache_enabled = True  # Enable caching for static data
+    
+    def _get_api_session_cookie(self) -> Optional[str]:
+        """Get the API session cookie from Flask session."""
+        try:
+            from flask import session as flask_session
+            return flask_session.get('_api_session_cookie')
+        except:
+            return None
+    
+    def _save_api_session_cookie(self, cookie_value: str):
+        """Save the API session cookie to Flask session."""
+        try:
+            from flask import session as flask_session
+            flask_session['_api_session_cookie'] = cookie_value
+            flask_session.modified = True
+            logger.info(f"   💾 Saved session cookie to Flask session")
+        except Exception as e:
+            logger.warning(f"Could not save cookie to Flask session: {e}")
+    
+    def _restore_api_session_cookie(self):
+        """Restore the API session cookie from Flask session to requests session."""
+        saved_cookie = self._get_api_session_cookie()
+        if saved_cookie and 'session' not in self.session.cookies:
+            self.session.cookies.set('session', saved_cookie)
+            logger.info(f"   🔄 Restored session cookie from Flask session")
+            return True
+        return False
         
     def _create_session(self) -> requests.Session:
         """Create a new requests session with optimizations."""
@@ -136,6 +163,8 @@ class APIClient:
         Each thread gets its own session with persistent cookies."""
         if not hasattr(self._local, 'session'):
             self._local.session = self._create_session()
+            # Restore session cookie from Flask session if it exists
+            self._restore_api_session_cookie()
         return self._local.session
     
     def _store_session_in_flask(self, api_session_id: str):
@@ -236,11 +265,24 @@ class APIClient:
         start_time = time.time()
         logger.info("   🔹 API: start_session")
         try:
+            # Log cookies before request
+            logger.info(f"   📦 Cookies before start_session: {dict(self.session.cookies)}")
+            
             response = self.session.post(
                 f"{self.base_url}/session/start",
                 timeout=self.default_timeout
             )
+            
+            # Log response headers to see Set-Cookie
+            logger.info(f"   📥 Response Set-Cookie headers: {response.headers.get('Set-Cookie', 'None')}")
+            logger.info(f"   📦 Cookies after start_session: {dict(self.session.cookies)}")
+            
             result = self._handle_response(response)
+            
+            # CRITICAL: Save the session cookie to Flask session
+            # so it persists across different thread-local sessions
+            if 'session' in self.session.cookies:
+                self._save_api_session_cookie(self.session.cookies['session'])
             
             # Store session_id in Flask session for reference (if returned)
             if 'session_id' in result:
@@ -343,6 +385,9 @@ class APIClient:
         start_time = time.time()
         logger.info("   🔹 API: get_first_question")
         try:
+            # Log cookies being sent
+            logger.info(f"   📦 Cookies being sent: {dict(self.session.cookies)}")
+            
             response = self.session.get(
                 f"{self.base_url}/questions/first",
                 timeout=self.default_timeout
