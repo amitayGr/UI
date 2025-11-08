@@ -42,22 +42,22 @@ def after_request(response):
 
 
 @question_page.before_request
-def check_active_session():
-    """Middleware to ensure API session state is initialized.
-    Creates a new API session if one doesn't exist."""
-    try:
-        # Check if we have an active API session
-        api_status = api_client.get_session_status()
-        if not api_status.get('active', False):
-            # Start a new API session
-            api_client.start_session()
-    except Exception as e:
-        # If API is not available or session creation fails, start a new one
+def ensure_api_session():
+    """Ensure API session is started; avoid repeated status checks using a flag."""
+    if not session.get('api_session_active'):
         try:
-            api_client.start_session()
-        except Exception as start_error:
-            print(f"Failed to start API session: {str(start_error)}")
-            # Continue with local fallback if needed
+            api_status = api_client.get_session_status()
+            if api_status.get('active', False):
+                session['api_session_active'] = True
+            else:
+                api_client.start_session()
+                session['api_session_active'] = True
+        except Exception:
+            try:
+                api_client.start_session()
+                session['api_session_active'] = True
+            except Exception as start_error:
+                print(f"Failed to start API session: {str(start_error)}")
 
 
 @question_page.route('/')
@@ -71,27 +71,14 @@ def question():
         return redirect(url_for('login_page.login'))
 
     try:
-        # Start a new API session and get the first question
-        api_client.start_session()
+        bootstrap = api_client.bootstrap_initial(include_debug=(user_role == 'admin'))
         UserLogger.log_session_start("NEW_SESSION")
 
-        # Get first question from API
-        question_data = api_client.get_first_question()
+        question_data = bootstrap.get('question', {})
         question_id = question_data.get('question_id')
         question_text = question_data.get('question_text')
-
-        # For admin users, get debug information (if available via API)
-        debug_info = None
-        if user_role == 'admin':
-            try:
-                # Try to get session status for debug info
-                status = api_client.get_session_status()
-                debug_info = status.get('state', {})
-            except Exception:
-                debug_info = None
-
-        # Get answer options from API
-        answer_options = api_client.get_answer_options()
+        debug_info = bootstrap.get('debug') if user_role == 'admin' else None
+        answer_options = bootstrap.get('answer_options', {})
         answers = answer_options.get('answers', [])
 
         return render_template(
@@ -101,7 +88,8 @@ def question():
             question_text=question_text,
             debug_info=debug_info,
             answer_options=answers,
-            initial_theorems=[]  # Will be populated after first answer
+            initial_theorems=[],
+            bootstrap_errors=bootstrap.get('bootstrap_errors')
         )
     except Exception as e:
         print(f"Error in question route: {str(e)}")

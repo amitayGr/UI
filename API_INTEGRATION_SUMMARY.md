@@ -22,6 +22,82 @@ Key features:
 - Feedback submission
 - Statistics and session history
 - Database utilities (triangles, tables, health check)
+- Performance Layer (November 2025 additions):
+   - Connection pooling and retry strategy re-enabled (duplicate session property removed)
+   - Adaptive timeouts per endpoint category (health/status/static vs heavy queries)
+   - Simple circuit breaker (opens after repeated failures, cools down automatically)
+   - In-memory TTL cache with accurate expiration (answers/options, theorems, triangle types)
+   - Bootstrap method consolidating initial page data retrieval
+   - Rolling metrics for latency and failures per endpoint (accessible via `api_client.get_metrics()`)
+   - Breaker status available via `api_client.breaker_status()` for diagnostics
+
+#### Performance Architecture (Detailed)
+| Component | Purpose | Implementation | Tuning Options |
+|-----------|---------|----------------|----------------|
+| Connection Pooling | Reuse TCP connections to reduce latency | `requests.Session` + `HTTPAdapter(pool_maxsize=20)` | Increase `pool_maxsize` under high concurrency |
+| Retry Strategy | Fast recovery from transient 5xx errors | `Retry(total=2, backoff_factor=0.1)` | Raise `total` for flaky networks |
+| Adaptive Timeouts | Match timeout to expected endpoint latency | `timeout_profile` dict | Adjust per category (`theorems`, `submit`) |
+| TTL Cache | Reduce repeated static fetches | `SimpleCache` with per-key TTL | Replace with LRU for memory-bound scenarios |
+| Circuit Breaker | Fail fast during outage, reduce pressure | Failure count threshold & cooldown | Tune threshold/cooldown to SLA |
+| Metrics | Visibility into client behavior | Rolling averages stored in `_metrics` | Export periodically or expose endpoint |
+| Bootstrap Consolidation | Lower initial page round-trips | `bootstrap_initial()` | Replace with server-side `/bootstrap` |
+
+#### Circuit Breaker Behavior
+The breaker tracks consecutive failures of protected calls. After 5 failures:
+1. Breaker opens and remains open for 30 seconds.
+2. All protected calls raise an exception immediately: `API temporarily unavailable (circuit breaker)`.
+3. After cooldown, breaker resets (failure count cleared) and calls proceed.
+
+You can inspect its state:
+```python
+from api_client import api_client
+print(api_client.breaker_status())
+# Example output:
+# {'open': False, 'failures': 0, 'open_until': None}
+```
+
+#### Metrics Usage
+Every instrumented call updates rolling metrics:
+```python
+from api_client import api_client
+metrics = api_client.get_metrics()
+for name, data in metrics.items():
+   print(f"{name}: avg={data['avg_ms']:.1f}ms last={data['last_ms']:.1f}ms failures={data['failures']}/{data['count']}")
+```
+Metric Keys:
+- `session_start`, `session_status`
+- `question_first`, `question_next`
+- `answer_submit`
+- `answers_options`
+- `theorems_all`
+- `health`
+
+#### Bootstrap Flow
+The UI initial question page now calls:
+```python
+bootstrap = api_client.bootstrap_initial(include_debug=is_admin)
+question = bootstrap.get('question')
+answers = bootstrap.get('answer_options', {}).get('answers', [])
+debug = bootstrap.get('debug')
+errors = bootstrap.get('bootstrap_errors')
+```
+This consolidates multiple calls and centralizes future optimizations (e.g., server-side batching, conditional headers).
+
+#### Suggested Future Enhancements (Client Perspective)
+- Replace `SimpleCache` with size-bounded LRU (e.g., `cachetools.TTLCache`).
+- Add passive background refresh for near-expiry cached items.
+- Provide an internal `@with_timeout(category)` decorator for consistency.
+- Integrate optional compression for large theorem payload responses.
+
+#### Changelog (Performance Layer)
+| Date | Change | Impact |
+|------|--------|--------|
+| 2025-11-08 | Removed duplicate session property | Restored pooling & retries |
+| 2025-11-08 | Added `bootstrap_initial()` | Reduced initial calls & improved organization |
+| 2025-11-08 | Implemented adaptive timeouts | More efficient failure detection |
+| 2025-11-08 | Added circuit breaker | Faster recovery & reduced cascade failures |
+| 2025-11-08 | Added metrics collection | Enabled latency monitoring |
+| 2025-11-08 | Improved cache expiration logic | Accurate TTL handling |
 
 ### 2. Updated Page Modules
 
@@ -148,6 +224,8 @@ if check_api_health():
 2. **Session Management**: Test concurrent user sessions
 3. **Memory Usage**: Monitor for any memory leaks in long sessions
 4. **Database Load**: Verify local DB performance remains good
+5. **Metrics Inspection**: Use `api_client.get_metrics()` during runtime to review average latency and failure counts.
+6. **Circuit Breaker**: Force failures (e.g., stop API) and confirm breaker opens and later recovers.
 
 ## Migration Benefits
 
@@ -168,6 +246,8 @@ if check_api_health():
 - **Third-party Integration**: API can be consumed by external systems
 - **A/B Testing**: Easy to test different learning algorithms
 - **Multi-tenancy**: API supports multiple UI deployments
+- **Batched Endpoints**: Planned server-side `/bootstrap` and extended `/answers/submit` to further reduce round-trips.
+- **Conditional Requests**: Future ETag / If-None-Match support for static endpoints.
 
 ## Troubleshooting Guide
 

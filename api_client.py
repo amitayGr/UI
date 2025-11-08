@@ -17,7 +17,7 @@ Date: November 2025
 """
 
 import requests
-from typing import Dict, List, Optional, Any, Union, Tuple
+from typing import Dict, List, Optional, Any, Union, Tuple, Callable
 from flask import session as flask_session
 import logging
 import threading
@@ -44,10 +44,11 @@ class SimpleCache:
         with self._lock:
             if key in self._cache:
                 timestamp = self._timestamps.get(key)
-                if timestamp and (datetime.now() - timestamp).seconds < ttl_seconds:
-                    return self._cache[key]
-                else:
-                    # Expired, remove from cache
+                if timestamp:
+                    age = (datetime.now() - timestamp).total_seconds()
+                    if age < ttl_seconds:
+                        return self._cache[key]
+                    # Expired
                     del self._cache[key]
                     del self._timestamps[key]
             return None
@@ -91,8 +92,25 @@ class APIClient:
         self._local = threading.local()
         
         # Performance settings
-        self.default_timeout = 3  # Reduced from default 30s for faster failure detection
+        self.default_timeout = 3  # Fallback timeout
         self.cache_enabled = True  # Enable caching for static data
+        # Adaptive timeout mapping per endpoint group
+        self.timeout_profile: Dict[str, int] = {
+            'health': 1,
+            'status': 1,
+            'static': 2,
+            'question': 4,
+            'submit': 4,
+            'theorems': 6,
+            'history': 5,
+        }
+        # Circuit breaker state
+        self._failure_count = 0
+        self._breaker_open_until: Optional[datetime] = None
+        self._breaker_threshold = 5
+        self._breaker_cooldown_seconds = 30
+        # Metrics storage (rolling averages)
+        self._metrics: Dict[str, Dict[str, Any]] = {}
         
     def _create_session(self) -> requests.Session:
         """Create a new requests session with optimizations."""
@@ -131,17 +149,47 @@ class APIClient:
         if not hasattr(self._local, 'session'):
             self._local.session = self._create_session()
         return self._local.session
-    @property
-    def session(self):
-        """Get or create a thread-local requests session."""
-        if not hasattr(self._local, 'session'):
-            self._local.session = requests.Session()
-            # Set default headers for this thread's session
-            self._local.session.headers.update({
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            })
-        return self._local.session
+
+    def bootstrap_initial(self, include_debug: bool = False) -> Dict[str, Any]:
+        """Bootstrap initial data for question page with minimal round-trips.
+
+        Currently sequential; centralizes logic for future batching or concurrency.
+        Returns keys: question, answer_options, debug (optional), bootstrap_errors (if any).
+        """
+        result: Dict[str, Any] = {}
+        errors: List[str] = []
+
+        # Start or confirm session
+        try:
+            self.start_session()
+        except Exception as e:
+            errors.append(f"start_session: {e}")
+
+        # First question
+        try:
+            result['question'] = self.get_first_question()
+        except Exception as e:
+            errors.append(f"get_first_question: {e}")
+            result['question'] = {}
+
+        # Answer options (cached)
+        try:
+            result['answer_options'] = self.get_answer_options()
+        except Exception as e:
+            errors.append(f"get_answer_options: {e}")
+            result['answer_options'] = {'answers': []}
+
+        if include_debug:
+            try:
+                status = self.get_session_status()
+                result['debug'] = status.get('state', {})
+            except Exception as e:
+                errors.append(f"get_session_status: {e}")
+                result['debug'] = None
+
+        if errors:
+            result['bootstrap_errors'] = errors
+        return result
     
     def _sync_session_cookies(self):
         """Synchronize Flask session cookies with requests session."""
@@ -212,6 +260,61 @@ class APIClient:
         result = fetch_func()
         _cache.set(cache_key, result)
         return result
+
+    # === Circuit Breaker & Metrics ===
+    def _is_breaker_open(self) -> bool:
+        if self._breaker_open_until and datetime.now() < self._breaker_open_until:
+            return True
+        if self._breaker_open_until and datetime.now() >= self._breaker_open_until:
+            # Cooldown ended
+            self._breaker_open_until = None
+            self._failure_count = 0
+        return False
+
+    def _record_success(self):
+        self._failure_count = 0
+
+    def _record_failure(self):
+        self._failure_count += 1
+        if self._failure_count >= self._breaker_threshold:
+            self._breaker_open_until = datetime.now() + timedelta(seconds=self._breaker_cooldown_seconds)
+            logger.warning("Circuit breaker opened due to repeated failures")
+
+    def _time_call(self, name: str, func: Callable[[], Any]) -> Any:
+        start = datetime.now()
+        try:
+            result = func()
+            elapsed_ms = (datetime.now() - start).total_seconds() * 1000
+            self._update_metrics(name, elapsed_ms, True)
+            self._record_success()
+            return result
+        except Exception:
+            elapsed_ms = (datetime.now() - start).total_seconds() * 1000
+            self._update_metrics(name, elapsed_ms, False)
+            self._record_failure()
+            raise
+
+    def _update_metrics(self, name: str, elapsed_ms: float, success: bool):
+        data = self._metrics.setdefault(name, {
+            'count': 0,
+            'total_ms': 0.0,
+            'failures': 0,
+            'avg_ms': 0.0,
+            'last_ms': 0.0,
+        })
+        data['count'] += 1
+        data['total_ms'] += elapsed_ms
+        data['last_ms'] = elapsed_ms
+        if not success:
+            data['failures'] += 1
+        data['avg_ms'] = data['total_ms'] / data['count']
+
+    def get_metrics(self) -> Dict[str, Any]:
+        """Return snapshot of client performance metrics."""
+        return self._metrics
+
+    def _choose_timeout(self, category: str) -> int:
+        return self.timeout_profile.get(category, self.default_timeout)
     
     # === Session Management ===
     
@@ -222,12 +325,16 @@ class APIClient:
         Returns:
             Dictionary containing session_id and success message
         """
-        try:
+        if self._is_breaker_open():
+            raise Exception("API temporarily unavailable (circuit breaker)")
+        def _call():
             response = self.session.post(
                 f"{self.base_url}/session/start",
-                timeout=self.default_timeout
+                timeout=self._choose_timeout('status')
             )
             return self._handle_response(response)
+        try:
+            return self._time_call('session_start', _call)
         except Exception as e:
             logger.error(f"Failed to start session: {str(e)}")
             raise
@@ -239,12 +346,16 @@ class APIClient:
         Returns:
             Dictionary containing session status and state information
         """
-        try:
+        if self._is_breaker_open():
+            raise Exception("API temporarily unavailable (circuit breaker)")
+        def _call():
             response = self.session.get(
                 f"{self.base_url}/session/status",
-                timeout=self.default_timeout
+                timeout=self._choose_timeout('status')
             )
             return self._handle_response(response)
+        try:
+            return self._time_call('session_status', _call)
         except Exception as e:
             logger.error(f"Failed to get session status: {str(e)}")
             raise
@@ -303,12 +414,16 @@ class APIClient:
         Returns:
             Dictionary containing question_id and question_text
         """
-        try:
+        if self._is_breaker_open():
+            raise Exception("API temporarily unavailable (circuit breaker)")
+        def _call():
             response = self.session.get(
                 f"{self.base_url}/questions/first",
-                timeout=self.default_timeout
+                timeout=self._choose_timeout('question')
             )
             return self._handle_response(response)
+        try:
+            return self._time_call('question_first', _call)
         except Exception as e:
             logger.error(f"Failed to get first question: {str(e)}")
             raise
@@ -320,12 +435,16 @@ class APIClient:
         Returns:
             Dictionary containing question_id, question_text, and info
         """
-        try:
+        if self._is_breaker_open():
+            raise Exception("API temporarily unavailable (circuit breaker)")
+        def _call():
             response = self.session.get(
                 f"{self.base_url}/questions/next",
-                timeout=self.default_timeout
+                timeout=self._choose_timeout('question')
             )
             return self._handle_response(response)
+        try:
+            return self._time_call('question_next', _call)
         except Exception as e:
             logger.error(f"Failed to get next question: {str(e)}")
             raise
@@ -356,15 +475,15 @@ class APIClient:
             Dictionary containing list of answer options
         """
         def fetch():
-            try:
+            if self._is_breaker_open():
+                raise Exception("API temporarily unavailable (circuit breaker)")
+            def _call():
                 response = self.session.get(
                     f"{self.base_url}/answers/options",
-                    timeout=self.default_timeout
+                    timeout=self._choose_timeout('static')
                 )
                 return self._handle_response(response)
-            except Exception as e:
-                logger.error(f"Failed to get answer options: {str(e)}")
-                raise
+            return self._time_call('answers_options', _call)
         
         # Cache for 1 hour (answer options rarely change)
         return self._get_cached_or_fetch("answer_options", fetch, ttl_seconds=3600)
@@ -380,7 +499,9 @@ class APIClient:
         Returns:
             Dictionary containing processing results and relevant theorems
         """
-        try:
+        if self._is_breaker_open():
+            raise Exception("API temporarily unavailable (circuit breaker)")
+        def _call():
             data = {
                 "question_id": question_id,
                 "answer_id": answer_id
@@ -388,9 +509,11 @@ class APIClient:
             response = self.session.post(
                 f"{self.base_url}/answers/submit",
                 json=data,
-                timeout=self.default_timeout
+                timeout=self._choose_timeout('submit')
             )
             return self._handle_response(response)
+        try:
+            return self._time_call('answer_submit', _call)
         except Exception as e:
             logger.error(f"Failed to submit answer: {str(e)}")
             raise
@@ -414,22 +537,21 @@ class APIClient:
         cache_key = f"theorems_active={active_only}_cat={category}"
         
         def fetch():
-            try:
+            if self._is_breaker_open():
+                raise Exception("API temporarily unavailable (circuit breaker)")
+            def _call():
                 params = {}
                 if active_only:
                     params["active_only"] = "true"
                 if category is not None:
                     params["category"] = str(category)
-                    
                 response = self.session.get(
                     f"{self.base_url}/theorems",
                     params=params,
-                    timeout=self.default_timeout
+                    timeout=self._choose_timeout('theorems')
                 )
                 return self._handle_response(response)
-            except Exception as e:
-                logger.error(f"Failed to get theorems: {str(e)}")
-                raise
+            return self._time_call('theorems_all', _call)
         
         # Cache for 10 minutes (theorems don't change often)
         return self._get_cached_or_fetch(cache_key, fetch, ttl_seconds=600)
@@ -625,12 +747,16 @@ class APIClient:
         Returns:
             Dictionary containing server health status
         """
-        try:
+        if self._is_breaker_open():
+            raise Exception("API temporarily unavailable (circuit breaker)")
+        def _call():
             response = self.session.get(
                 f"{self.base_url}/health",
-                timeout=self.default_timeout
+                timeout=self._choose_timeout('health')
             )
             return self._handle_response(response)
+        try:
+            return self._time_call('health', _call)
         except Exception as e:
             logger.error(f"Health check failed: {str(e)}")
             raise
@@ -659,6 +785,14 @@ class APIClient:
         """Enable caching for static data."""
         self.cache_enabled = True
         logger.info("API caching enabled")
+
+    def breaker_status(self) -> Dict[str, Any]:
+        """Return circuit breaker state information."""
+        return {
+            'open': self._is_breaker_open(),
+            'failures': self._failure_count,
+            'open_until': self._breaker_open_until.isoformat() if self._breaker_open_until else None
+        }
 
 
 # Global API client instance
