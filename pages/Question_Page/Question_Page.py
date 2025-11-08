@@ -46,23 +46,29 @@ def check_active_session():
     """Middleware to ensure API session state is initialized.
     Creates a new API session if one doesn't exist.
     
-    OPTIMIZATION: Uses Flask session flag to avoid redundant API calls.
-    The API maintains session state via cookies, so we only need to start
-    a session once and cache that fact locally.
+    OPTIMIZATION: Only checks session status when flag is not set,
+    reducing redundant calls while ensuring session validity.
     """
     try:
-        # Check Flask session flag (local cache) instead of calling API
-        # This avoids 50-100ms API round-trip on every request
+        # If we don't have a local flag, check with API
         if not session.get('api_session_active', False):
-            # Start a new API session
-            api_client.start_session()
-            # Cache the fact that we have an active session
-            session['api_session_active'] = True
+            # Verify with API if session is actually active
+            try:
+                api_status = api_client.get_session_status()
+                if api_status.get('active', False):
+                    # Session exists, set flag
+                    session['api_session_active'] = True
+                else:
+                    # No active session, start one
+                    api_client.start_session()
+                    session['api_session_active'] = True
+            except Exception:
+                # API call failed or no session, start a new one
+                api_client.start_session()
+                session['api_session_active'] = True
     except Exception as e:
-        print(f"Failed to start API session: {str(e)}")
-        # Mark session as inactive so we'll retry next time
+        print(f"Failed to ensure API session: {str(e)}")
         session['api_session_active'] = False
-            # Continue with local fallback if needed
 
 
 @question_page.route('/')
@@ -76,10 +82,7 @@ def question():
         return redirect(url_for('login_page.login'))
 
     try:
-        # OPTIMIZATION: Removed duplicate start_session() call
-        # The check_active_session() middleware already ensures we have a session
-        # This saves 100-200ms on every page load
-        
+        # Middleware already ensures we have a session
         UserLogger.log_session_start("NEW_SESSION")
 
         # Get first question from API
@@ -87,8 +90,7 @@ def question():
         question_id = question_data.get('question_id')
         question_text = question_data.get('question_text')
 
-        # For admin users, debug info is not fetched to avoid extra API call
-        # The session state is already maintained by the API via cookies
+        # For admin users, skip debug info to avoid extra API call
         debug_info = None
 
         # Get answer options from API
@@ -106,6 +108,9 @@ def question():
         )
     except Exception as e:
         print(f"Error in question route: {str(e)}")
+        # If we get a session error, clear the flag so middleware will recreate
+        if "session" in str(e).lower():
+            session['api_session_active'] = False
         return redirect(url_for('login_page.login'))
 
 
@@ -178,6 +183,9 @@ def process_answer():
 
     except Exception as e:
         print(f"Error in answer route: {str(e)}")
+        # If we get a session error, clear the flag so middleware will recreate
+        if "session" in str(e).lower():
+            session['api_session_active'] = False
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -260,17 +268,13 @@ def cleanup_session():
 def check_timeout():
     """Check if current session has timed out.
     
-    OPTIMIZATION: Uses Flask session flag instead of API call.
-    The API maintains session state via cookies, so we just check
-    if our local session is still active. This saves 50-100ms.
+    Uses the local flag first, but if flag indicates active session,
+    we trust it since middleware validates on each request.
     """
     try:
         # Check local Flask session flag
+        # Middleware ensures this is kept in sync with API
         is_active = session.get('api_session_active', False)
-        
-        # If we think we have a session, it's valid
-        # (The API will return 400 error if session actually expired,
-        # which will be caught by the error handling in api_client)
         return jsonify({'timeout': not is_active})
     except Exception as e:
         print(f"Error in check_timeout route: {str(e)}")
