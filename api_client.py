@@ -25,9 +25,14 @@ from functools import lru_cache
 from datetime import datetime, timedelta
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+import time
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Configure logging with precise timestamps
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s.%(msecs)03d [%(name)s] %(message)s',
+    datefmt='%H:%M:%S'
+)
 logger = logging.getLogger(__name__)
 
 # Performance optimization: Simple cache for static data
@@ -222,14 +227,20 @@ class APIClient:
         Returns:
             Dictionary containing session_id and success message
         """
+        start_time = time.time()
+        logger.info("   🔹 API: start_session")
         try:
             response = self.session.post(
                 f"{self.base_url}/session/start",
                 timeout=self.default_timeout
             )
-            return self._handle_response(response)
+            result = self._handle_response(response)
+            elapsed = (time.time() - start_time) * 1000
+            logger.info(f"   ✅ API: start_session - {elapsed:.2f}ms")
+            return result
         except Exception as e:
-            logger.error(f"Failed to start session: {str(e)}")
+            elapsed = (time.time() - start_time) * 1000
+            logger.error(f"   ❌ API: start_session - {elapsed:.2f}ms - {str(e)}")
             raise
     
     def get_session_status(self) -> Dict[str, Any]:
@@ -239,14 +250,20 @@ class APIClient:
         Returns:
             Dictionary containing session status and state information
         """
+        start_time = time.time()
+        logger.info("   🔹 API: get_session_status")
         try:
             response = self.session.get(
                 f"{self.base_url}/session/status",
                 timeout=self.default_timeout
             )
-            return self._handle_response(response)
+            result = self._handle_response(response)
+            elapsed = (time.time() - start_time) * 1000
+            logger.info(f"   ✅ API: get_session_status - {elapsed:.2f}ms")
+            return result
         except Exception as e:
-            logger.error(f"Failed to get session status: {str(e)}")
+            elapsed = (time.time() - start_time) * 1000
+            logger.error(f"   ❌ API: get_session_status - {elapsed:.2f}ms - {str(e)}")
             raise
     
     def end_session(self, feedback: Optional[int] = None, 
@@ -303,14 +320,20 @@ class APIClient:
         Returns:
             Dictionary containing question_id and question_text
         """
+        start_time = time.time()
+        logger.info("   🔹 API: get_first_question")
         try:
             response = self.session.get(
                 f"{self.base_url}/questions/first",
                 timeout=self.default_timeout
             )
-            return self._handle_response(response)
+            result = self._handle_response(response)
+            elapsed = (time.time() - start_time) * 1000
+            logger.info(f"   ✅ API: get_first_question - {elapsed:.2f}ms")
+            return result
         except Exception as e:
-            logger.error(f"Failed to get first question: {str(e)}")
+            elapsed = (time.time() - start_time) * 1000
+            logger.error(f"   ❌ API: get_first_question - {elapsed:.2f}ms - {str(e)}")
             raise
     
     def get_next_question(self) -> Dict[str, Any]:
@@ -320,14 +343,20 @@ class APIClient:
         Returns:
             Dictionary containing question_id, question_text, and info
         """
+        start_time = time.time()
+        logger.info("   🔹 API: get_next_question")
         try:
             response = self.session.get(
                 f"{self.base_url}/questions/next",
                 timeout=self.default_timeout
             )
-            return self._handle_response(response)
+            result = self._handle_response(response)
+            elapsed = (time.time() - start_time) * 1000
+            logger.info(f"   ✅ API: get_next_question - {elapsed:.2f}ms")
+            return result
         except Exception as e:
-            logger.error(f"Failed to get next question: {str(e)}")
+            elapsed = (time.time() - start_time) * 1000
+            logger.error(f"   ❌ API: get_next_question - {elapsed:.2f}ms - {str(e)}")
             raise
     
     def get_question_details(self, question_id: int) -> Dict[str, Any]:
@@ -355,6 +384,9 @@ class APIClient:
         Returns:
             Dictionary containing list of answer options
         """
+        start_time = time.time()
+        logger.info("   🔹 API: get_answer_options")
+        
         def fetch():
             try:
                 response = self.session.get(
@@ -367,7 +399,10 @@ class APIClient:
                 raise
         
         # Cache for 1 hour (answer options rarely change)
-        return self._get_cached_or_fetch("answer_options", fetch, ttl_seconds=3600)
+        result = self._get_cached_or_fetch("answer_options", fetch, ttl_seconds=3600)
+        elapsed = (time.time() - start_time) * 1000
+        logger.info(f"   ✅ API: get_answer_options - {elapsed:.2f}ms (cached: {elapsed < 5})")
+        return result
     
     def submit_answer(self, question_id: int, answer_id: int) -> Dict[str, Any]:
         """
@@ -380,6 +415,8 @@ class APIClient:
         Returns:
             Dictionary containing processing results and relevant theorems
         """
+        start_time = time.time()
+        logger.info(f"   🔹 API: submit_answer (Q{question_id}, A{answer_id})")
         try:
             data = {
                 "question_id": question_id,
@@ -390,9 +427,14 @@ class APIClient:
                 json=data,
                 timeout=self.default_timeout
             )
-            return self._handle_response(response)
+            result = self._handle_response(response)
+            elapsed = (time.time() - start_time) * 1000
+            theorem_count = len(result.get('relevant_theorems', []))
+            logger.info(f"   ✅ API: submit_answer - {elapsed:.2f}ms ({theorem_count} theorems)")
+            return result
         except Exception as e:
-            logger.error(f"Failed to submit answer: {str(e)}")
+            elapsed = (time.time() - start_time) * 1000
+            logger.error(f"   ❌ API: submit_answer - {elapsed:.2f}ms - {str(e)}")
             raise
     
     # === Theorems ===
